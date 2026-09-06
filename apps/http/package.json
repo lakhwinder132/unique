@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,10 @@
     "cors": "^2.8.6",
     "dotenv": "^16.0.3",
     "express": "^5.2.1",
+    "microsoft-cognitiveservices-speech-sdk": "^1.51.0",
     "openai": "^7.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1"
   }
 }

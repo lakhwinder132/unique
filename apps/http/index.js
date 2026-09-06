@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import * as sdk from "microsoft-cognitiveservices-speech-sdk";
 
 dotenv.config({ path: "./.env" });
 
@@ -338,6 +339,122 @@ ${JSON.stringify(weather)}
 
 Please try again.
 `
+        });
+
+    }
+
+});
+
+app.post("/tts", async (req, res) => {
+
+    try {
+
+        const { text, language } = req.body;
+
+        if (!text) {
+            return res.status(400).json({
+                message: "Text is required"
+            });
+        }
+
+        const speechConfig =
+            sdk.SpeechConfig.fromSubscription(
+                process.env.AZURE_SPEECH_KEY,
+                process.env.AZURE_SPEECH_REGION
+            );
+
+
+        // Default voice
+        let voice = "en-IN-NeerjaNeural";
+
+
+        // Choose voice depending on language
+        switch (language) {
+
+            case "hi":
+                voice = "hi-IN-SwaraNeural";
+                break;
+
+            case "pa":
+                voice = "pa-IN-OjasNeural";
+                break;
+
+            case "en":
+                voice = "en-IN-NeerjaNeural";
+                break;
+
+            default:
+                voice = "en-IN-NeerjaNeural";
+        }
+
+
+        speechConfig.speechSynthesisVoiceName = voice;
+
+
+        speechConfig.speechSynthesisOutputFormat =
+            sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
+
+
+        const synthesizer =
+            new sdk.SpeechSynthesizer(
+                speechConfig,
+                undefined
+            );
+
+
+        synthesizer.speakTextAsync(
+
+            text,
+
+            (result) => {
+
+                synthesizer.close();
+
+                if (
+                    result.reason ===
+                    sdk.ResultReason.SynthesizingAudioCompleted
+                ) {
+
+                    const audioBuffer =
+                        Buffer.from(result.audioData);
+
+                    res.set({
+                        "Content-Type": "audio/mpeg",
+                        "Content-Length":
+                            audioBuffer.length
+                    });
+
+                    return res.send(audioBuffer);
+
+                }
+
+                return res.status(500).json({
+                    message: "Speech synthesis failed"
+                });
+
+            },
+
+            (error) => {
+
+                synthesizer.close();
+
+                console.error(error);
+
+                return res.status(500).json({
+                    message: "Speech synthesis error"
+                });
+
+            }
+
+        );
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+            message: "TTS error"
         });
 
     }
