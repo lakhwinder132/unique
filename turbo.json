@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "OPENROUTER_API_KEY",
+        "OPENWEATHER_API_KEY"
+      ]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "OPENROUTER_API_KEY",
+        "OPENWEATHER_API_KEY"
+      ]
+    }
+  }
+}
