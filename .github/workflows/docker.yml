@@ -22,7 +22,7 @@ jobs:
           context: .
           file: ./doker/Dockerfile.turbo
           push: true
-          tags: lakhwinder97187/ollama-farmer:${{github.sha}}
+          tags:  ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
 
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.2
@@ -32,9 +32,9 @@ jobs:
           key: ${{secrets.VM_SSH_KEY}} 
           script: |
             docker pull ${{secrets.DOCKERHUB_USERNAME}}/ollama-farmer:${{github.sha}}
-            docker stop Ollama-farmer || ture
-            docker rrm Ollama-farmer || true
+            docker stop ollama-farmer || ture
+            docker rrm ollama-farmer || true
 
-            docker run -d --name Ollama-farmer --restart unless-stopped -p 3001:3001 -p 3000:3000 -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
+            docker run -d --name ollama-farmer --restart unless-stopped -p 3001:3001 -p 3000:3000 -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
             docker image prune -f
         
