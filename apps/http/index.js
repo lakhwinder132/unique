@@ -35,6 +35,6 @@ app.get('/extract/:ques',async (req,res)=>{
     }
 });
 
-app.listen(3001,()=>{
+app.listen(3001,'0.0.0.0',()=>{
     console.log('listening on port 3000');
 });

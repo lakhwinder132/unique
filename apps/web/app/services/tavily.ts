@@ -11,8 +11,9 @@ export async function searchWeb(
   question: string
 ): Promise<SearchResult[]> {
   const res = await axios.get<SearchResult[]>(
-    `http://localhost:3001/extract/${encodeURIComponent(question)}`
+    `http://16.4.17.94:3001/extract/${encodeURIComponent(question)}`
   );
+
 
   const relevantData = res.data
     .filter((item) => item.relevance >= 0.8)
