@@ -11,7 +11,7 @@ export async function searchWeb(
   question: string
 ): Promise<SearchResult[]> {
   const res = await axios.get<SearchResult[]>(
-    `http://16.4.17.94:3001/extract/${encodeURIComponent(question)}`
+    `http://52.66.94.185:3001/extract/${encodeURIComponent(question)}`
   );
 
 

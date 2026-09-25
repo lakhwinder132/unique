@@ -1,5 +1,5 @@
 
-const OLLAMA_URL = `http://16.4.17.94:11434`;
+const OLLAMA_URL = `http://52.66.94.185:11434`;
 const MODEL = "qwen3:1.7b";
 
 type OllamaOptions = {
