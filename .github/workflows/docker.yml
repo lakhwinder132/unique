@@ -32,8 +32,8 @@ jobs:
           key: ${{secrets.VM_SSH_KEY}} 
           script: |
             sudo docker pull ${{secrets.DOCKERHUB_USERNAME}}/ollama-farmer:${{github.sha}}
-            sudo docker stop ollama-farmer || ture
-            sudo docker rrm ollama-farmer || true
+            sudo docker stop ollama-farmer || true
+            sudo docker rm ollama-farmer || true
 
             sudo docker run -d --name ollama-farmer --restart unless-stopped -p 3001:3001 -p 3000:3000 -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
             sudo docker image prune -f
