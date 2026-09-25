@@ -1,4 +1,5 @@
 "use client";
+
 import "./chatui.css";
 import ReactMarkdown from "react-markdown";
 import {
@@ -33,12 +34,63 @@ export default function ChatUI({
   onKeyDown,
 }: ChatUIProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
+  const scrollToBottom = (smooth = true) => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "end",
+      });
     });
+  };
+
+  /*
+   * Scroll when:
+   * - user sends a message
+   * - AI starts thinking
+   * - AI response changes while streaming
+   */
+  useEffect(() => {
+    scrollToBottom(true);
+  }, [response, send]);
+
+  /*
+   * Extra scroll after rendering.
+   * This helps when Markdown changes the height of the response.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollToBottom(false);
+    }, 50);
+
+    return () => clearTimeout(timer);
   }, [response]);
+
+  /*
+   * ResizeObserver watches the AI response.
+   * If the response grows while streaming, the chat
+   * automatically follows the newest content.
+   */
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (send) {
+        scrollToBottom(false);
+      }
+    });
+
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [send]);
 
   return (
     <div className="chat-app">
@@ -47,21 +99,29 @@ export default function ChatUI({
 
       <header className="chat-header">
         <div className="brand">
+
           <div className="brand-icon">
             🌾
           </div>
 
           <div>
             <h1>Farmer AI</h1>
-            <p>Powered by Ollama</p>
+
+            <p>
+              Powered by Ollama
+            </p>
           </div>
+
         </div>
       </header>
 
 
       {/* Messages */}
 
-      <main className="chat-messages">
+      <main
+        ref={messagesContainerRef}
+        className="chat-messages"
+      >
 
         {!response && !send && (
           <div className="welcome">
@@ -83,7 +143,9 @@ export default function ChatUI({
         )}
 
 
-        {response && (
+        {/* User message */}
+
+        {send || response ? (
           <div className="message user-message">
 
             <div className="avatar">
@@ -91,6 +153,7 @@ export default function ChatUI({
             </div>
 
             <div className="message-body">
+
               <div className="message-name">
                 You
               </div>
@@ -98,11 +161,14 @@ export default function ChatUI({
               <div className="message-text">
                 {prompt}
               </div>
+
             </div>
 
           </div>
-        )}
+        ) : null}
 
+
+        {/* AI message */}
 
         {(response || send) && (
           <div className="message ai-message">
@@ -144,6 +210,7 @@ export default function ChatUI({
           </div>
         )}
 
+
         <div ref={messagesEndRef} />
 
       </main>
@@ -157,7 +224,7 @@ export default function ChatUI({
 
           <input
             type="text"
-            placeholder="Ask anything..."
+            placeholder="Ask anything about farming..."
             value={prompt}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
