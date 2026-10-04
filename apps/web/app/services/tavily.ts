@@ -1,5 +1,3 @@
-import axios from "axios";
-
 export type SearchResult = {
   title: string;
   source: string;
@@ -10,12 +8,26 @@ export type SearchResult = {
 export async function searchWeb(
   question: string
 ): Promise<SearchResult[]> {
-  const res = await axios.get<SearchResult[]>(
-    `http://52.66.94.185:3001/extract/${encodeURIComponent(question)}`
-  );
+  const response = await fetch("/api/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  const data: unknown = await response.json().catch(() => null);
 
+  if (!response.ok || !Array.isArray(data)) {
+    throw new Error("Web search is unavailable.");
+  }
 
-  const relevantData = res.data
+  const relevantData = data
+    .filter((item): item is SearchResult =>
+      item !== null &&
+      typeof item === "object" &&
+      "title" in item && typeof item.title === "string" &&
+      "source" in item && typeof item.source === "string" &&
+      "information" in item && typeof item.information === "string" &&
+      "relevance" in item && typeof item.relevance === "number"
+    )
     .filter((item) => item.relevance >= 0.8)
     .map((item) => ({
       title: item.title,
@@ -31,12 +43,13 @@ export function createWebContext(
   results: SearchResult[]
 ): string {
   return results
+    .slice(0, 3)
     .map(
       (item, index) => `
 Source ${index + 1}
 Title: ${item.title}
 URL: ${item.source}
-Information: ${item.information}
+Information: ${item.information.slice(0, 900)}
 `
     )
     .join("\n");
