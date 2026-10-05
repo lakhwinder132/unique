@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SEARCH_SERVICE_URL = "http://15.206.209.123:3001";
+const SEARCH_SERVICE_URL = "http://ai.shelly22.online";
 
 export async function POST(request: NextRequest) {
   let question: unknown;
@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
       cache: "no-store",
     });
     if (!response.ok) {
-      return NextResponse.json({ error: "Web search is unavailable." }, { status: 502 });
+      console.error(`Search upstream returned HTTP ${response.status}.`);
+      return NextResponse.json({ error: `Web search service returned HTTP ${response.status}.` }, { status: 502 });
     }
 
     const results: unknown = await response.json().catch(() => null);
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(results, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    console.error("Search proxy connection failed:", error);
     return NextResponse.json({ error: "Web search is unavailable." }, { status: 502 });
   }
 }

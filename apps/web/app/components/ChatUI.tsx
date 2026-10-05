@@ -6,6 +6,7 @@ import "./fieldwise.css";
 import ReactMarkdown from "react-markdown";
 import { ChangeEvent, KeyboardEvent, useEffect, useRef } from "react";
 import WeatherWidget, { type WeatherData } from "./WeatherWidget";
+import { getLanguageName } from "../services/language";
 
 type ChatUIProps = {
   prompt: string;
@@ -184,11 +185,12 @@ export default function ChatUI({
           <label className="speech-language-control" htmlFor="speech-language">
             <span>Voice language</span>
             <select id="speech-language" value={speechLanguageChoice} onChange={onSpeechLanguageChange} disabled={voiceMode || send}>
+              <option value="auto">Auto-detect</option>
               <option value="pa">Punjabi</option><option value="hi">Hindi</option><option value="en">English</option>
             </select>
           </label>
           {voiceMode && <p className="voice-mode-status" aria-live="polite">{listening ? "Listening…" : send ? "Thinking…" : speaking ? "Speaking…" : "Voice conversation active"}</p>}
-          {language && <p className="voice-language">Detected: {language === "pa" ? "Punjabi" : language === "hi" ? "Hindi" : language === "en" ? "English" : language}</p>}
+          {language && <p className="voice-language">Detected: {getLanguageName(language)}</p>}
           <p className="input-hint">AI can make mistakes. Confirm important advice with a local agricultural expert.</p>
         </div>
         {speechError && <p className="speech-error input-speech-error" role="status">{speechError}</p>}

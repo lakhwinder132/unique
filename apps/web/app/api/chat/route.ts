@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://15.206.209.123:11434";
+const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://ai.shelly22.online";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -24,7 +24,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!upstream.ok) {
-      return NextResponse.json({ error: "The assistant service returned an error." }, { status: 502 });
+      console.error(`Ollama upstream returned HTTP ${upstream.status}.`);
+      return NextResponse.json(
+        { error: `The assistant backend returned HTTP ${upstream.status}. Check that Ollama is available at the configured server address.` },
+        { status: 502 },
+      );
     }
     if (!upstream.body) {
       return NextResponse.json({ error: "The assistant returned no response." }, { status: 502 });
@@ -37,7 +41,11 @@ export async function POST(request: NextRequest) {
         "X-Accel-Buffering": "no",
       },
     });
-  } catch {
-    return NextResponse.json({ error: "The assistant service is unavailable." }, { status: 502 });
+  } catch (error) {
+    console.error("Ollama proxy connection failed:", error);
+    return NextResponse.json(
+      { error: "Could not connect to the Ollama backend. Check the configured server address and network access." },
+      { status: 502 },
+    );
   }
 }

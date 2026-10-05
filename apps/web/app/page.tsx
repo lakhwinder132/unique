@@ -18,6 +18,7 @@ import {
 } from "./services/tavily";
 
 import { askOllama } from "./services/ollama";
+import { detectTextLanguage } from "./services/language";
 import { recordAudio } from "./speech/speechRecorder";
 
 import "./app.css";
@@ -45,6 +46,57 @@ function cleanTextForSpeech(text: string) {
     .replace(/[*#>_~-]/g, " ");
 }
 
+async function speakWithDeviceVoice(text: string, language: string, signal: AbortSignal) {
+  const synthesis = window.speechSynthesis;
+  if (!synthesis) {
+    throw new Error("Speech playback is not available in this browser.");
+  }
+
+  const findVoice = () => synthesis.getVoices().find((candidate) =>
+    candidate.lang.toLowerCase().split("-")[0] === language.toLowerCase()
+  );
+  let voice = findVoice();
+  if (!voice) {
+    await awaitVoiceList(synthesis);
+    voice = findVoice();
+  }
+  if (!voice) {
+    const languageName = new Intl.DisplayNames(["en"], { type: "language" }).of(language) ?? language;
+    throw new Error(`This device does not have a ${languageName} voice installed.`);
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = voice;
+  utterance.lang = voice.lang;
+
+  return new Promise<void>((resolve, reject) => {
+    const finish = (error?: Error) => {
+      signal.removeEventListener("abort", handleAbort);
+      if (error) reject(error);
+      else resolve();
+    };
+    const handleAbort = () => {
+      synthesis.cancel();
+      finish();
+    };
+
+    utterance.onend = () => finish();
+    utterance.onerror = () => finish(new Error("Device speech playback failed."));
+    signal.addEventListener("abort", handleAbort, { once: true });
+    synthesis.speak(utterance);
+  });
+}
+
+function awaitVoiceList(synthesis: SpeechSynthesis) {
+  return new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(resolve, 1500);
+    synthesis.addEventListener("voiceschanged", () => {
+      window.clearTimeout(timeout);
+      resolve();
+    }, { once: true });
+  });
+}
+
 export default function App() {
   // ============================================
   // EXISTING CHAT STATES
@@ -62,7 +114,7 @@ export default function App() {
 
   const [listening, setListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
-  const [speechLanguageChoice, setSpeechLanguageChoice] = useState("pa");
+  const [speechLanguageChoice, setSpeechLanguageChoice] = useState("auto");
   const [language, setLanguage] = useState("");
   const [speaking, setSpeaking] = useState(false);
   const [speechError, setSpeechError] = useState("");
@@ -141,7 +193,9 @@ export default function App() {
       console.error(error);
 
       setResponse(
-        "The assistant could not be reached. Check your connection and try again."
+        error instanceof Error
+          ? error.message
+          : "The assistant could not be reached. Check your connection and try again."
       );
     } finally {
       setSend(false);
@@ -272,17 +326,20 @@ export default function App() {
     const controller = new AbortController();
     speechController.current = controller;
     try {
-      const speechLanguage = /[\u0A00-\u0A7F]/.test(text) || detectedLanguage === "pa"
-        ? "pa"
-        : /[\u0900-\u097F]/.test(text) || detectedLanguage === "hi"
-          ? "hi"
-          : "en";
+      const cleanedText = cleanTextForSpeech(text);
+      const speechLanguage = detectedLanguage || detectTextLanguage(cleanedText)?.code || "en";
+      if (!["pa", "hi", "en"].includes(speechLanguage)) {
+        await speakWithDeviceVoice(cleanedText, speechLanguage, controller.signal);
+        setSpeaking(false);
+        return;
+      }
+
       const result = await fetch("/api/speech/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          text: cleanTextForSpeech(text),
+          text: cleanedText,
           language: speechLanguage,
         }),
       });
@@ -352,7 +409,7 @@ export default function App() {
       // NEW VOICE PROPS
       listening={listening}
       voiceMode={voiceMode}
-      language={language}
+      language={language || (prompt.trim().length >= 10 ? detectTextLanguage(prompt)?.code ?? "" : "")}
       speaking={speaking}
       speechError={speechError}
       onSpeak={() => handleSpeak()}

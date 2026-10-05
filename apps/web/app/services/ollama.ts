@@ -1,3 +1,5 @@
+import { detectTextLanguage } from "./language";
+
 const MODEL = "qwen3:1.7b";
 
 type OllamaOptions = {
@@ -17,9 +19,16 @@ function buildSystemPrompt(prompt: string) {
     year: "numeric",
   });
 
+  const detectedLanguage = detectTextLanguage(prompt);
   const language = hasGurmukhi(prompt)
     ? "Reply in simple, natural Punjabi (Gurmukhi script) using everyday farmer words."
-    : "Reply in the same language the user writes in. If the user writes Punjabi in English letters, reply in Punjabi (Gurmukhi).";
+    : detectedLanguage?.code === "pa"
+      ? "The user's message is in Punjabi. Reply in simple, natural Punjabi (Gurmukhi script) using everyday farmer words, even if the user writes Punjabi with Latin letters."
+    : detectedLanguage?.code === "hi"
+      ? "The user's message is in Hindi. Reply in simple, natural Hindi using Devanagari script, even if the user writes Hindi with Latin letters."
+    : detectedLanguage
+      ? `The user's message is in ${detectedLanguage.name}. Reply entirely in ${detectedLanguage.name}. Do not switch to English unless asked.`
+      : "Identify the language of the user's message and reply entirely in that language. Do not default to English unless the user wrote in English.";
 
   return `You are a helpful AI assistant for farmers in Punjab, India. Today's date is ${today}.
 
