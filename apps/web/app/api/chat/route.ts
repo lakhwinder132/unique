@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://ai.shelly22.online";
+const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://3.108.65.156:11434";
 const RAG_TOP_K = Number(process.env.RAG_TOP_K ?? "5");
 const RAG_DEBUG = (process.env.RAG_DEBUG ?? "false").toLowerCase() === "true";
 const DATA_ROOT = "D:\\Users\\Course_Code\\data\\punjabi-farmer-data";
