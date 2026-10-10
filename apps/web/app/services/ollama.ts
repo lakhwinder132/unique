@@ -1,7 +1,7 @@
 import { detectTextLanguage } from "./language";
 
 const MODEL = "qwen3:1.7b";
-const OLLAMA_URL = "http://3.108.65.156:11434";
+const OLLAMA_URL = "http://ai.shelly22.online";
 
 type OllamaOptions = {
   prompt: string;
