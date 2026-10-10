@@ -12,8 +12,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Fieldwise | Farmer assistant",
-  description: "Practical crop, soil, weather and farming guidance for your field.",
+  title: "Kisan AI | Your farming partner",
+  description: "Practical crop, soil, weather and farming guidance for Punjabi farmers.",
 };
 
 export default function RootLayout({

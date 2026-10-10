@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SEARCH_SERVICE_URL = "http://ai.shelly22.online";
+const SEARCH_SERVICE_URL = "http://3.108.65.156:3001";
 
 export async function POST(request: NextRequest) {
   let question: unknown;
