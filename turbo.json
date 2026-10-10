@@ -26,7 +26,8 @@
       "persistent": true,
       "env": [
         "TAVILY_API_KEY",
-        "OPENWEATHER_API_KEY"
+        "OPENWEATHER_API_KEY",
+        "BHASHINI_INFERENCE_KEY"
       ]
     }
   }
