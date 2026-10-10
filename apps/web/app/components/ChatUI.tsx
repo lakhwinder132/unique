@@ -23,7 +23,8 @@ import {
   X,
 } from "lucide-react";
 import { getLanguageName } from "../services/language";
-import WeatherWidget, { type WeatherData } from "./WeatherWidget";
+import WeatherWidget from "./WeatherWidget";
+import type { WeatherData } from "../services/weather";
 
 type ChatUIProps = {
   prompt: string;
@@ -90,6 +91,7 @@ export default function ChatUI({
   const shouldAutoScrollRef = useRef(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNavigation, setActiveNavigation] = useState("New chat");
+  const [weatherReady, setWeatherReady] = useState(false);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -180,7 +182,12 @@ export default function ChatUI({
           shouldAutoScrollRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 96;
         }}>
           {!response && !send && (
-            <section className="welcome" aria-labelledby="welcome-title">
+            <section className={`welcome${weatherReady ? " weather-ready" : ""}`} aria-labelledby="welcome-title">
+              <WeatherWidget language={speechLanguageChoice === "auto" ? language ?? "en" : speechLanguageChoice} onWeatherLoaded={(weather) => {
+                setWeatherReady(true);
+                onWeatherLoaded(weather);
+              }} />
+
               <div className="field-banner">
                 <div className="field-banner-shade" />
                 <div className="field-banner-content">
@@ -204,8 +211,6 @@ export default function ChatUI({
                   </button>
                 ))}
               </div>
-
-              <WeatherWidget onWeatherLoaded={onWeatherLoaded} />
 
               <div className="welcome-bottomline"><span><AudioLines size={15} /> Ask naturally, in Punjabi, Hindi or English</span><span className="trust-note"><span className="trust-check">✓</span> Thoughtful advice for real fields</span></div>
             </section>

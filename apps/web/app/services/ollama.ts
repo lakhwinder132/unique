@@ -69,10 +69,10 @@ How to use them:
   }
 
   if (weatherContext?.trim()) {
-    context.push(`LOCAL WEATHER FORECAST (OpenWeather data):
+    context.push(`LOCAL WEATHER FORECAST (Open-Meteo data, model output):
 ${weatherContext}
 
-Use this forecast as the source for local current and upcoming weather. Explain that forecasts can change; do not present rain probability as certainty.`);
+Use this structured forecast only for the selected location and its stated timestamps/timezone. Explain that forecasts can change; do not present rain probability as certainty. If the data status is unavailable, say weather data has not been loaded and ask the user to select a location. Do not invent weather values. Weather indicators are not crop-specific recommendations.`);
   }
 
   if (context.length === 0) return prompt;

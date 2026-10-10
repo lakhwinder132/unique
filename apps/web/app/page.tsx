@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import ChatUI from "./components/ChatUI";
-import type { WeatherData } from "./components/WeatherWidget";
+import type { WeatherData } from "./services/weather";
 
 import {
   searchWeb,
@@ -25,15 +25,76 @@ import "./app.css";
 
 const weatherQuestionPattern = /\b(weather|forecast|rain|rainfall|temperature|wind|windy|humidity|heat|cold|storm|cloud|spray|irrigat|mausam|barish|baarish|meeh|garmi|thand|hawa)\b|मौसम|बारिश|वर्षा|तापमान|हवा|आर्द्रता|तूफान|ਮੌਸਮ|ਮੀਂਹ|ਬਾਰਿਸ਼|ਤਾਪਮਾਨ|ਹਵਾ|ਨਮੀ|ਤੂਫ਼ਾਨ/i;
 
-function buildWeatherContext(weather: WeatherData) {
-  const location = [weather.location, weather.country].filter(Boolean).join(", ");
-  const periods = weather.todayForecast.length > 0
-    ? weather.todayForecast.map((period) =>
-      `${period.time}: ${period.temperatureC}°C, ${period.description}, ${period.rainChance}% chance of rain`
-    ).join("\n")
-    : "No further 3-hour forecast periods are available for today.";
+function buildWeatherContext(weather: WeatherData, question: string) {
+  const asksForRain = /rain|precip|shower|irrigat|water|meeh|ਮੀਂਹ|ਬਾਰਿਸ਼|बारिश|वर्षा|सਿੰਚਾਈ/i.test(question);
+  const asksForWind = /wind|spray|ਹਵਾ|ਛਿੜਕ|हवा/i.test(question);
+  const asksForSoil = /soil|moisture|irrigat|evapotranspir|ਮਿੱਟੀ|ਸਿੰਚਾਈ|मिट्टी|सिंचाई/i.test(question);
+  const asksForLongRange = /week|7.day|daily|tomorrow|ਆਉਣ ਵਾਲੇ ਦਿਨ|ਹਫ਼ਤ|अगले दिन|सप्ताह/i.test(question);
+  const currentFields = [
+    "temperature_2m",
+    "apparent_temperature",
+    "relative_humidity_2m",
+    "weather_code",
+    ...(asksForRain ? ["precipitation", "rain", "showers"] : []),
+    ...(asksForWind ? ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"] : []),
+    ...(asksForSoil ? ["soil_temperature_0cm", "soil_moisture_0_to_1cm"] : []),
+  ];
+  const hourlyFields = [
+    "temperature_2m",
+    "weather_code",
+    ...(asksForRain ? ["precipitation_probability", "precipitation", "rain", "showers"] : []),
+    ...(asksForWind ? ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"] : []),
+    ...(asksForSoil ? ["soil_moisture_0_to_1cm", "soil_moisture_9_to_27cm", "et0_fao_evapotranspiration"] : []),
+  ];
+  const current = Object.fromEntries(currentFields.flatMap((key) =>
+    weather.current[key] === undefined ? [] : [[key, weather.current[key]]],
+  ));
+  const hourly = weather.hourly.time
+    .map((time, index) => ({ time, index }))
+    .filter(({ time }) => Date.parse(time) >= Date.parse(String(weather.current.time)))
+    .slice(0, 6)
+    .map(({ time, index }) => ({
+      time,
+      values: Object.fromEntries(hourlyFields.flatMap((key) => {
+        const values = weather.hourly[key];
+        return Array.isArray(values) && values[index] !== undefined ? [[key, values[index]]] : [];
+      })),
+    }));
+  const daily = asksForLongRange
+    ? weather.daily.time.map((time, index) => ({
+      time,
+      temperature_2m_min: weather.daily.temperature_2m_min?.[index],
+      temperature_2m_max: weather.daily.temperature_2m_max?.[index],
+      precipitation_probability_max: weather.daily.precipitation_probability_max?.[index],
+      precipitation_sum: weather.daily.precipitation_sum?.[index],
+    }))
+    : undefined;
+  const currentUnits = Object.fromEntries(currentFields.flatMap((key) =>
+    weather.currentUnits[key] ? [[key, weather.currentUnits[key]]] : [],
+  ));
+  const hourlyUnits = Object.fromEntries(hourlyFields.flatMap((key) =>
+    weather.hourlyUnits[key] ? [[key, weather.hourlyUnits[key]]] : [],
+  ));
 
-  return `Location: ${location}\nRetrieved from OpenWeather at ${weather.fetchedAt} (UTC). Forecast times are local to the location.\nCurrent conditions: ${weather.temperatureC}°C, ${weather.description}; feels like ${weather.feelsLikeC}°C, humidity ${weather.humidity}%, wind ${weather.windKmh} km/h.\nForecast for the rest of today:\n${periods}`;
+  return JSON.stringify({
+    source: "Open-Meteo forecast model",
+    location: [weather.location, weather.country].filter(Boolean).join(", "),
+    coordinates: { latitude: weather.latitude, longitude: weather.longitude },
+    fetchedAt: weather.fetchedAt,
+    timezone: weather.timezone,
+    timezoneAbbreviation: weather.timezoneAbbreviation,
+    units: { current: currentUnits, hourly: hourlyUnits },
+    ...(asksForLongRange ? {
+      dailyUnits: {
+        temperature_2m_min: weather.dailyUnits.temperature_2m_min,
+        temperature_2m_max: weather.dailyUnits.temperature_2m_max,
+        precipitation_sum: weather.dailyUnits.precipitation_sum,
+      },
+    } : {}),
+    current,
+    nextHours: hourly,
+    ...(daily ? { nextDays: daily } : {}),
+  });
 }
 
 function cleanTextForSpeech(text: string) {
@@ -153,8 +214,14 @@ export default function App() {
       console.warn("Web search unavailable; answering without it.", searchError);
     }
 
-    const weatherContext = weatherData && weatherQuestionPattern.test(question)
-      ? buildWeatherContext(weatherData)
+    const weatherQuestion = weatherQuestionPattern.test(question);
+    const weatherContext = weatherQuestion
+      ? weatherData
+        ? buildWeatherContext(weatherData, question)
+        : JSON.stringify({
+          status: "unavailable",
+          instruction: "No selected-location Open-Meteo data is loaded. Tell the user that weather data is unavailable and ask them to select a location; do not invent current or forecast conditions.",
+        })
       : undefined;
 
     return askOllama({
