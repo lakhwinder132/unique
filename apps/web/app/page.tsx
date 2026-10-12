@@ -11,12 +11,6 @@ import {
 import ChatUI from "./components/ChatUI";
 import type { WeatherData } from "./services/weather";
 
-import {
-  searchWeb,
-  createWebContext,
-  type SearchResult,
-} from "./services/tavily";
-
 import { askOllama } from "./services/ollama";
 import { detectTextLanguage } from "./services/language";
 import { recordAudio } from "./speech/speechRecorder";
@@ -207,13 +201,6 @@ export default function App() {
   };
 
   const getAnswer = async (question: string) => {
-    let searchResults: SearchResult[] = [];
-    try {
-      searchResults = await searchWeb(question);
-    } catch (searchError) {
-      console.warn("Web search unavailable; answering without it.", searchError);
-    }
-
     const weatherQuestion = weatherQuestionPattern.test(question);
     const weatherContext = weatherQuestion
       ? weatherData
@@ -226,9 +213,9 @@ export default function App() {
 
     return askOllama({
       prompt: question,
-      webContext: createWebContext(searchResults),
       weatherContext,
       onChunk: setResponse,
+      onMetrics: (metrics) => console.info("[chat-timing]", metrics),
     });
   };
 
@@ -258,12 +245,12 @@ export default function App() {
       return await getAnswer(question);
     } catch (error) {
       console.error(error);
-
-      setResponse(
-        error instanceof Error
-          ? error.message
-          : "The assistant could not be reached. Check your connection and try again."
-      );
+      const message = error instanceof Error
+        ? error.message
+        : "The assistant could not be reached. Check your connection and try again.";
+      setResponse((current) => current
+        ? `${current}\n\n**The response was interrupted:** ${message}`
+        : message);
     } finally {
       setSend(false);
     }
@@ -466,7 +453,7 @@ export default function App() {
       send={send}
 
       onPromptChange={handleChange}
-      onSubmit={() => handleSubmit()}
+      onSubmit={(question) => handleSubmit(question)}
       onSuggestionSelect={(text) => {
         setLanguage("");
         setPrompt(text);

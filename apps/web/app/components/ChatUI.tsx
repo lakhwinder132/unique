@@ -39,7 +39,7 @@ type ChatUIProps = {
   speechLanguageChoice: string;
   onWeatherLoaded: (weather: WeatherData) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: () => void;
+  onSubmit: (prompt?: string) => void;
   onSuggestionSelect: (text: string) => void;
   onVoiceInput: () => void;
   onSpeak: () => void;
@@ -58,13 +58,6 @@ const recentChats = [
   "Wheat irrigation schedule",
   "Yellowing leaves in mustard",
   "Preparing soil for vegetables",
-];
-
-const suggestions = [
-  { label: "CROP ADVISORY", title: "Keep your crop on track", description: "Practical advice for wheat, rice, and more.", prompt: "How should I care for my wheat crop this week?", icon: Sprout, tone: "green" },
-  { label: "WEATHER", title: "Plan around the weather", description: "Understand what changing conditions mean for your field.", prompt: "What weather should I plan around this week in Punjab?", icon: CloudSun, tone: "sky" },
-  { label: "MANDI PRICES", title: "Make a confident sale", description: "Ask about prices, timing, and market decisions.", prompt: "What should I consider before selling my wheat at the mandi?", icon: Wheat, tone: "gold" },
-  { label: "PUNJABI · ਪੰਜਾਬੀ", title: "Gall Punjabi vich kariye", description: "Ask anything about your farm in Punjabi.", prompt: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਮੈਂ ਆਪਣੀ ਫ਼ਸਲ ਬਾਰੇ ਸਲਾਹ ਲੈਣੀ ਹੈ।", icon: MessageCircle, tone: "terracotta" },
 ];
 
 export default function ChatUI({
@@ -91,7 +84,7 @@ export default function ChatUI({
   const shouldAutoScrollRef = useRef(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNavigation, setActiveNavigation] = useState("New chat");
-  const [weatherReady, setWeatherReady] = useState(false);
+  const [weatherLocation, setWeatherLocation] = useState("");
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -168,7 +161,7 @@ export default function ChatUI({
         <header className="chat-header">
           <div className="header-leading"><button className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation menu"><Menu size={20} /></button><span className="header-page-title">Your farm assistant</span></div>
           <div className="header-tools">
-            <span className="location-pill"><MapPin size={14} /><span>Punjab, India</span></span><span className="header-divider" />
+            <span className="location-pill"><MapPin size={14} /><span>{weatherLocation || "Farm weather"}</span></span><span className="header-divider" />
             <label className="language-select" htmlFor="speech-language"><span>Language</span>
               <select id="speech-language" value={speechLanguageChoice} onChange={onSpeechLanguageChange} disabled={voiceMode || send}>
                 <option value="auto">Auto-detect</option><option value="pa">Punjabi</option><option value="hi">Hindi</option><option value="en">English</option>
@@ -182,37 +175,11 @@ export default function ChatUI({
           shouldAutoScrollRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 96;
         }}>
           {!response && !send && (
-            <section className={`welcome${weatherReady ? " weather-ready" : ""}`} aria-labelledby="welcome-title">
+            <section className="welcome weather-home-welcome" aria-label="Punjabi farm weather">
               <WeatherWidget language={speechLanguageChoice === "auto" ? language ?? "en" : speechLanguageChoice} onWeatherLoaded={(weather) => {
-                setWeatherReady(true);
+                setWeatherLocation([weather.location, weather.country].filter(Boolean).join(", "));
                 onWeatherLoaded(weather);
-              }} />
-
-              <div className="field-banner">
-                <div className="field-banner-shade" />
-                <div className="field-banner-content">
-                  <span className="banner-kicker"><span className="banner-kicker-mark"><Wheat size={13} /></span> A LITTLE CLOSER TO YOUR FIELD</span>
-                  <h1 id="welcome-title">Your Farming Partner,<br />Powered by AI.</h1>
-                  <p>Practical answers for every season, rooted in Punjab.</p>
-                </div>
-                <div className="banner-caption"><span className="caption-dot" /> RABI SEASON <span className="caption-rule" /> PUNJAB, INDIA</div>
-              </div>
-
-              <div className="welcome-intro">
-                <div><p className="welcome-overline">SAT SRI AKAL <span>·</span> WHAT'S ON YOUR MIND?</p><h2>Good morning. How can I help?</h2></div>
-                <p className="welcome-note">Field-tested guidance, whenever you need it.</p>
-              </div>
-
-              <div className="suggestion-grid" aria-label="Suggested questions">
-                {suggestions.map(({ label, title, description, prompt: suggestionPrompt, icon: Icon, tone }, index) => (
-                  <button className={`suggestion-card tone-${tone}`} key={title} type="button" onClick={() => choosePrompt(suggestionPrompt)}>
-                    <span className="suggestion-topline"><span className="suggestion-icon"><Icon size={18} strokeWidth={1.8} /></span><span className="suggestion-label">{label}</span><span className="suggestion-arrow"><ArrowUpRight size={16} /></span></span>
-                    <span className="suggestion-copy"><strong>{title}</strong><span>{description}</span></span><span className="suggestion-index">0{index + 1}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="welcome-bottomline"><span><AudioLines size={15} /> Ask naturally, in Punjabi, Hindi or English</span><span className="trust-note"><span className="trust-check">✓</span> Thoughtful advice for real fields</span></div>
+              }} onAskAssistant={(question) => onSubmit(question)} />
             </section>
           )}
 
@@ -237,7 +204,7 @@ export default function ChatUI({
             <div className="chat-input-wrapper">
               <input type="text" placeholder={listening ? "Listening… speak now" : "Ask about your crops, soil, pests…"} value={prompt} onChange={onPromptChange} onKeyDown={onKeyDown} disabled={send || listening || voiceMode} aria-label="Ask Kisan AI a farming question" />
               <button className={`voice-button${listening ? " listening" : ""}`} type="button" onClick={onVoiceInput} disabled={send && !voiceMode} aria-label={voiceMode ? "Stop voice conversation" : "Start voice conversation"} title={voiceMode ? "Stop voice conversation" : "Voice input"}>{voiceMode ? <X size={17} /> : <AudioLines size={17} />}<span>{voiceMode ? "Stop" : listening ? "Listening" : "Voice"}</span></button>
-              <button className="send-button" type="button" onClick={onSubmit} disabled={send || voiceMode || !prompt.trim()} aria-label="Send message" title="Send message">{send ? <span className="send-spinner" /> : <Send size={18} strokeWidth={2} />}</button>
+              <button className="send-button" type="button" onClick={() => onSubmit()} disabled={send || voiceMode || !prompt.trim()} aria-label="Send message" title="Send message">{send ? <span className="send-spinner" /> : <Send size={18} strokeWidth={2} />}</button>
             </div>
           </div>
           <div className="input-meta">
