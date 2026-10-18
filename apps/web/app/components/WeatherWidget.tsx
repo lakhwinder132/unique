@@ -864,6 +864,15 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
         )}
       </div>
 
+      <button
+        className="weather-assistant-action"
+        type="button"
+        onClick={() => onAskAssistant(assistantQuestion)}
+      >
+        <span>{copy.ask}</span>
+        <span className="weather-assistant-arrow" aria-hidden="true">↗</span>
+      </button>
+
       {weather && (
         <div className="weather-full-report">
           <section className="weather-day-section" aria-labelledby="weather-day-title">
@@ -897,6 +906,8 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
             <p className="weather-timeline-hint">Scroll along the timeline to explore the full day. The highlighted hour is now.</p>
           </section>
 
+          <details className="weather-more-details">
+            <summary>{language === "pa" ? "ਚਾਰਟ ਅਤੇ ਹੋਰ ਮੌਸਮੀ ਜਾਣਕਾਰੀ" : language === "hi" ? "चार्ट और मौसम की अन्य जानकारी" : "Charts and more weather details"}</summary>
           <DailyWeatherChart
             hours={dayHours}
             timezone={weather.timezone}
@@ -991,17 +1002,10 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
             </div>
             {dailyRain !== null && <div className="farm-weather-note-total"><span>MODELLED DAILY PRECIPITATION</span><strong>{formatMeasure(dailyRain, dailyRainUnit, 1)}</strong></div>}
           </section>
+          </details>
         </div>
       )}
 
-      <button
-        className="weather-assistant-action"
-        type="button"
-        onClick={() => onAskAssistant(assistantQuestion)}
-      >
-        <span>{copy.ask}</span>
-        <span className="weather-assistant-arrow" aria-hidden="true">↗</span>
-      </button>
       {weather && (
         <p className="weather-home-attribution">
           Forecast source: Open-Meteo{updatedAt ? ` · Updated ${updatedAt}${weather.timezoneAbbreviation ? ` (${weather.timezoneAbbreviation})` : ""}` : ""}

@@ -1152,3 +1152,105 @@
   .weather-reading-meter { width: 42px; }
   .chat-input-area { padding-right: 8px; padding-left: 8px; }
 }
+
+/* Visual-first hierarchy, Punjabi script support, and comfortable touch targets. */
+.chat-app {
+  font-family: "Noto Sans Gurmukhi", "Nirmala UI", "Raavi", var(--font-geist-sans), sans-serif;
+}
+.chat-messages {
+  scrollbar-gutter: stable;
+}
+.message-text {
+  font-size: 16px;
+  line-height: 1.75;
+}
+.message-name,
+.sidebar-label,
+.composer-label,
+.input-hint {
+  color: #53675a;
+}
+.weather-more-details {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.weather-more-details > summary {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #dfe7dc;
+  border-radius: 12px;
+  color: #344d3d;
+  background: #fffefa;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+.weather-more-details > summary::-webkit-details-marker { display: none; }
+.weather-more-details > summary::after {
+  content: "+";
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 50%;
+  color: #536b58;
+  background: #edf3e9;
+  font-size: 20px;
+  font-weight: 400;
+}
+.weather-more-details[open] > summary::after { content: "−"; }
+.weather-more-details > summary:focus-visible,
+.chat-app button:focus-visible,
+.chat-app a:focus-visible,
+.chat-app select:focus-visible,
+.weather-home input:focus-visible {
+  outline: 3px solid rgba(61, 119, 76, .38);
+  outline-offset: 3px;
+}
+.chat-header .mobile-menu-button,
+.chat-input-wrapper .voice-button,
+.chat-input-wrapper .send-button,
+.weather-home button,
+.weather-chart-tabs button {
+  min-height: 48px;
+}
+.chat-header .mobile-menu-button { min-width: 48px; }
+.chat-input-wrapper .voice-button { height: 48px; min-width: 48px; }
+.chat-input-wrapper .send-button { width: 48px; height: 48px; min-width: 48px; }
+.weather-home-search button { min-width: 44px; }
+
+@media (max-width: 700px) {
+  .chat-app { min-height: 0; height: 100dvh; }
+  .chat-messages { padding-top: 12px; padding-right: 12px; padding-left: 12px; }
+  .chat-input-area { padding-top: 8px; }
+  .message-text { font-size: 16px; }
+  .input-hint { max-width: 42rem; font-size: 11px; }
+  .weather-more-details { gap: 15px; }
+  .weather-more-details > summary { min-height: 52px; padding: 11px 13px; font-size: 14px; }
+  .weather-section-kicker { font-size: 11px; }
+  .weather-hour-item { min-width: 66px; }
+  .weather-hour-item time,
+  .weather-hour-rain { font-size: 12px; }
+}
+
+@media (max-width: 420px) {
+  .chat-header { min-height: 58px; flex-basis: 58px; }
+  .header-tools { max-width: 70%; }
+  .language-select select { min-height: 40px; }
+  .weather-assistant-action { min-height: 52px; font-size: 14px; }
+  .chat-input-wrapper { min-height: 56px; }
+  .chat-input-wrapper .voice-button { width: 44px; min-width: 44px; height: 44px; }
+  .chat-input-wrapper .send-button { width: 44px; min-width: 44px; height: 44px; }
+  .chat-input-wrapper input { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-more-details > summary::after { transition: none; }
+}
