@@ -18,7 +18,8 @@
       "persistent": true,
       "env": [
         "TAVILY_API_KEY",
-        "BHASHINI_INFERENCE_KEY"
+        "BHASHINI_INFERENCE_KEY",
+        "OLLAMA_URL"
       ]
     },
     "start": {
@@ -26,7 +27,8 @@
       "persistent": true,
       "env": [
         "TAVILY_API_KEY",
-        "BHASHINI_INFERENCE_KEY"
+        "BHASHINI_INFERENCE_KEY",
+        "OLLAMA_URL"
       ]
     }
   }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectTextLanguage } from "../../services/language";
 import { retrieveRagContext, type RagPayload } from "./rag-worker";
+import { getOllamaChatEndpoint, readOllamaStream } from "./ollama-server";
 
-const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://3.7.66.165:11434").replace(/\/+$/, "");
 const SEARCH_SERVICE_URL = process.env.SEARCH_SERVICE_URL ?? "http://3.108.65.156:3001";
 const MODEL = "qwen3:1.7b";
 const RAG_DEBUG = (process.env.RAG_DEBUG ?? "false").toLowerCase() === "true";
@@ -172,268 +172,276 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A message between 1 and 12,000 characters is required." }, { status: 400 });
   }
 
+  let ollamaEndpoint: URL;
+  try {
+    ollamaEndpoint = getOllamaChatEndpoint(process.env.OLLAMA_URL);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "OLLAMA_URL is not configured correctly.";
+    console.error("[chat]", requestId, "Ollama configuration error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
   const weatherContext = typeof body.weatherContext === "string" ? body.weatherContext.slice(0, 40000) : "";
   const history = legacyMessages.filter((message) =>
     message.role === "user" || message.role === "assistant",
   );
   const ragStarted = performance.now();
   const searchStarted = performance.now();
+  const timings: Record<string, number | boolean> = {};
   const requestController = new AbortController();
   const abortRequest = () => requestController.abort(request.signal.reason);
   request.signal.addEventListener("abort", abortRequest, { once: true });
+  const releaseRequestListener = () => request.signal.removeEventListener("abort", abortRequest);
+  const needsRag = farmingQuestionPattern.test(prompt);
+  const needsWebSearch = currentInformationPattern.test(prompt) && !weatherQuestionPattern.test(prompt);
+  const ragWorkPromise = needsRag
+    ? retrieveRagContext(prompt, detectAnswerLanguage(prompt), requestController.signal)
+      .then((payload) => {
+        timings.ragMs = Math.round(performance.now() - ragStarted);
+        if (RAG_DEBUG) console.log("[chat]", requestId, "rag results:", payload.results?.length ?? 0);
+        return payload;
+      })
+      .catch((error: unknown) => {
+        timings.ragMs = Math.round(performance.now() - ragStarted);
+        if (!requestController.signal.aborted) console.warn("[chat]", requestId, "RAG retrieval unavailable:", error);
+        return null;
+      })
+    : Promise.resolve(null).then((payload) => {
+      timings.ragMs = 0;
+      return payload;
+    });
+  const searchWorkPromise = needsWebSearch
+    ? retrieveWebContext(prompt, requestController.signal)
+      .then((context) => {
+        timings.webSearchMs = Math.round(performance.now() - searchStarted);
+        return context;
+      })
+      .catch((error: unknown) => {
+        timings.webSearchMs = Math.round(performance.now() - searchStarted);
+        if (!requestController.signal.aborted) console.warn("[chat]", requestId, "Web search unavailable:", error);
+        return "";
+      })
+    : Promise.resolve("").then((context) => {
+      timings.webSearchMs = 0;
+      return context;
+    });
 
-  let upstreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  let cancelled = false;
-  let firstTokenAt: number | null = null;
-  let latestMetadata: OllamaMetadata = {};
+  try {
+    const [ragResult, searchResult] = await Promise.all([
+      waitWithinBudget(ragWorkPromise, RAG_WAIT_BUDGET_MS),
+      waitWithinBudget(searchWorkPromise, WEB_SEARCH_WAIT_BUDGET_MS),
+    ]);
+    const ragPayload = ragResult.completed ? ragResult.value : null;
+    const webContext = searchResult.completed ? searchResult.value : "";
+    timings.ragWaitMs = needsRag ? Math.round(performance.now() - ragStarted) : 0;
+    timings.webSearchWaitMs = needsWebSearch ? Math.round(performance.now() - searchStarted) : 0;
+    if (needsRag && !ragResult.completed) {
+      timings.ragDeferred = true;
+      console.warn("[chat]", requestId, "RAG still warming; continuing without retrieval context.");
+    }
+    if (needsWebSearch && !searchResult.completed) {
+      timings.webSearchDeferred = true;
+      console.warn("[chat]", requestId, "Web search exceeded its wait budget; continuing without search context.");
+    }
+    if (requestController.signal.aborted) {
+      releaseRequestListener();
+      return new Response(null, { status: 499 });
+    }
+    timings.preparationMs = Math.round(performance.now() - requestStarted);
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      void (async () => {
-        const timings: Record<string, number | boolean> = {};
-        let ragPayload: RagPayload | null = null;
-        let webContext = "";
+    const system = [
+      SYSTEM_PROMPT,
+      `Today's date is ${new Date().toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}.`,
+      ragPayload?.system,
+      needsRag && !ragPayload
+        ? "Local PAU retrieval context is not available for this response. Do not claim that you used PAU sources; give careful general guidance and state when local verification is needed."
+        : undefined,
+      needsWebSearch && !webContext
+        ? "Current-information search results are not available for this response. Do not present time-sensitive claims as verified; state the limitation and suggest checking an authoritative current source."
+        : undefined,
+    ].filter(Boolean).join("\n\n");
+    const user = buildUserContent(prompt, ragPayload, webContext, weatherContext);
+    const messages = history.length > 0
+      ? history.map((message) => message === promptMessage?.message ? { ...message, content: user } : message)
+      : [{ role: "user", content: user }];
+    const finalMessages = [{ role: "system", content: system }, ...messages];
+
+    const ollamaStarted = performance.now();
+    let upstream: Response;
+    try {
+      upstream = await fetch(ollamaEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: finalMessages,
+          stream: true,
+          think: false,
+          keep_alive: "30m",
+          options: {
+            temperature: 0.3,
+            repeat_penalty: 1.1,
+            num_ctx: 8192,
+            num_predict: 900,
+          },
+        }),
+        cache: "no-store",
+        signal: AbortSignal.any([requestController.signal, AbortSignal.timeout(180000)]),
+      });
+    } catch (error) {
+      releaseRequestListener();
+      if (requestController.signal.aborted) return new Response(null, { status: 499 });
+      const errorName = error instanceof Error ? error.name : "Unknown error";
+      console.error("[chat]", requestId, `Ollama connection failed at ${ollamaEndpoint.origin} (${errorName}).`);
+      return NextResponse.json({
+        error: `Could not connect to Ollama at ${ollamaEndpoint.origin}. Verify OLLAMA_URL and network access from the application server.`,
+      }, { status: 502 });
+    }
+    timings.ollamaConnectMs = Math.round(performance.now() - ollamaStarted);
+
+    if (!upstream.ok) {
+      console.error("[chat]", requestId, `Ollama returned HTTP ${upstream.status} at ${ollamaEndpoint.origin}.`);
+      await upstream.body?.cancel().catch(() => undefined);
+      releaseRequestListener();
+      return NextResponse.json({
+        error: `Ollama returned HTTP ${upstream.status}. The model service may be unavailable.`,
+      }, { status: 502 });
+    }
+    const upstreamBody = upstream.body;
+    if (!upstreamBody) {
+      releaseRequestListener();
+      return NextResponse.json({ error: "Ollama returned no response stream." }, { status: 502 });
+    }
+    if (requestController.signal.aborted) {
+      await upstreamBody.cancel().catch(() => undefined);
+      releaseRequestListener();
+      return new Response(null, { status: 499 });
+    }
+
+    let cancelled = false;
+    let firstTokenAt: number | null = null;
+    let latestMetadata: OllamaMetadata = {};
+    let receivedDone = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
         sendEvent(controller, {
           type: "stage",
           stage: "preparing",
           requestId,
           receivedAt: receivedAt.toISOString(),
         });
+        sendEvent(controller, { type: "stage", stage: "generating", timings });
 
-        const needsRag = farmingQuestionPattern.test(prompt);
-        const needsWebSearch = currentInformationPattern.test(prompt) && !weatherQuestionPattern.test(prompt);
-        const ragWorkPromise = needsRag
-          ? retrieveRagContext(prompt, detectAnswerLanguage(prompt), requestController.signal)
-          .then((payload) => {
-            timings.ragMs = Math.round(performance.now() - ragStarted);
-            if (RAG_DEBUG) {
-              console.log("[chat]", requestId, "rag results:", payload.results?.length ?? 0);
-            }
-            return payload;
-          })
-          .catch((error: unknown) => {
-            timings.ragMs = Math.round(performance.now() - ragStarted);
-            if (!requestController.signal.aborted) {
-              console.warn("[chat]", requestId, "RAG retrieval unavailable:", error);
-            }
-            return null;
-          })
-          : Promise.resolve(null).then((payload) => {
-            timings.ragMs = 0;
-            return payload;
-          });
-        const searchWorkPromise = needsWebSearch
-          ? retrieveWebContext(prompt, requestController.signal)
-          .then((context) => {
-            timings.webSearchMs = Math.round(performance.now() - searchStarted);
-            return context;
-          })
-          .catch((error: unknown) => {
-            timings.webSearchMs = Math.round(performance.now() - searchStarted);
-            if (!requestController.signal.aborted) {
-              console.warn("[chat]", requestId, "Web search unavailable:", error);
-            }
-            return "";
-          })
-          : Promise.resolve("").then((context) => {
-            timings.webSearchMs = 0;
-            return context;
-          });
-        const ragPromise = waitWithinBudget(ragWorkPromise, RAG_WAIT_BUDGET_MS);
-        const searchPromise = waitWithinBudget(searchWorkPromise, WEB_SEARCH_WAIT_BUDGET_MS);
-
-        try {
-          const [ragResult, searchResult] = await Promise.all([ragPromise, searchPromise]);
-          ragPayload = ragResult.completed ? ragResult.value : null;
-          webContext = searchResult.completed ? searchResult.value : "";
-          timings.ragWaitMs = needsRag ? Math.round(performance.now() - ragStarted) : 0;
-          timings.webSearchWaitMs = needsWebSearch ? Math.round(performance.now() - searchStarted) : 0;
-          if (needsRag && !ragResult.completed) {
-            timings.ragDeferred = true;
-            console.warn("[chat]", requestId, "RAG still warming; continuing without retrieval context.");
-          }
-          if (needsWebSearch && !searchResult.completed) {
-            timings.webSearchDeferred = true;
-            console.warn("[chat]", requestId, "Web search exceeded its wait budget; continuing without search context.");
-          }
-          if (cancelled || requestController.signal.aborted) return;
-          timings.preparationMs = Math.round(performance.now() - requestStarted);
-
-          const system = [
-            SYSTEM_PROMPT,
-            `Today's date is ${new Date().toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}.`,
-            ragPayload?.system,
-            needsRag && !ragPayload
-              ? "Local PAU retrieval context is not available for this response. Do not claim that you used PAU sources; give careful general guidance and state when local verification is needed."
-              : undefined,
-            needsWebSearch && !webContext
-              ? "Current-information search results are not available for this response. Do not present time-sensitive claims as verified; state the limitation and suggest checking an authoritative current source."
-              : undefined,
-          ].filter(Boolean).join("\n\n");
-          const user = buildUserContent(prompt, ragPayload, webContext, weatherContext);
-          const messages = history.length > 0
-            ? history.map((message) => message === promptMessage?.message ? { ...message, content: user } : message)
-            : [{ role: "user", content: user }];
-          const finalMessages = [{ role: "system", content: system }, ...messages];
-
-          const ollamaStarted = performance.now();
-          const upstream = await fetch(`${OLLAMA_URL}/api/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: MODEL,
-              messages: finalMessages,
-              stream: true,
-              think: false,
-              keep_alive: "30m",
-              options: {
-                temperature: 0.3,
-                repeat_penalty: 1.1,
-                num_ctx: 8192,
-                num_predict: 900,
-              },
-            }),
-            cache: "no-store",
-            signal: AbortSignal.any([requestController.signal, AbortSignal.timeout(180000)]),
-          });
-          timings.ollamaConnectMs = Math.round(performance.now() - ollamaStarted);
-
-          if (!upstream.ok) {
-            const errorText = await upstream.text().catch(() => "");
-            console.error("[chat]", requestId, "Ollama upstream error response:", errorText.slice(0, 500));
-            throw new Error(`Ollama returned HTTP ${upstream.status}. The model service may be unavailable.`);
-          }
-          if (!upstream.body) throw new Error("Ollama returned no response stream.");
-
-          sendEvent(controller, { type: "stage", stage: "generating", timings });
-          upstreamReader = upstream.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let receivedDone = false;
-
-          const processLine = (rawLine: string) => {
-            let line = rawLine.trim();
-            while (line.startsWith("data:")) {
-              line = line.slice(5).trimStart();
-            }
-            if (!line) return;
-            if (line === "[DONE]") {
-              receivedDone = true;
-              return;
-            }
-
-            const chunk: unknown = JSON.parse(line);
-            if (!isRecord(chunk)) throw new Error("Ollama returned an invalid stream chunk.");
-            if (typeof chunk.error === "string") throw new Error(chunk.error);
-            if (chunk.type === "error") {
-              throw new Error(typeof chunk.message === "string" ? chunk.message : "The model service could not complete the response.");
-            }
-
-            const tokenText = isRecord(chunk.message) && typeof chunk.message.content === "string"
-              ? chunk.message.content
-              : chunk.type === "token" && typeof chunk.text === "string"
-                ? chunk.text
-                : "";
-            if (tokenText) {
-              if (firstTokenAt === null) {
-                firstTokenAt = performance.now();
-                timings.ollamaTimeToFirstTokenMs = Math.round(firstTokenAt - ollamaStarted);
-                console.info("[chat]", requestId, "first Ollama token", {
-                  requestReceivedAt: receivedAt.toISOString(),
-                  preparationMs: timings.preparationMs,
-                  ragMs: timings.ragMs,
-                  ragWaitMs: timings.ragWaitMs,
-                  webSearchMs: timings.webSearchMs,
-                  webSearchWaitMs: timings.webSearchWaitMs,
-                  ollamaConnectMs: timings.ollamaConnectMs,
-                  ollamaTimeToFirstTokenMs: timings.ollamaTimeToFirstTokenMs,
-                });
+        void (async () => {
+          try {
+            for await (const item of readOllamaStream(upstreamBody, requestController.signal)) {
+              if (cancelled || requestController.signal.aborted) return;
+              if (item.kind === "done") {
+                receivedDone = true;
+                continue;
               }
-              sendEvent(controller, { type: "token", text: tokenText });
+
+              const chunk = item.value;
+              if (!isRecord(chunk)) throw new Error("Ollama returned an invalid stream chunk.");
+              if (typeof chunk.error === "string") throw new Error(chunk.error);
+              if (chunk.type === "error") {
+                throw new Error(typeof chunk.message === "string" ? chunk.message : "The model service could not complete the response.");
+              }
+
+              const tokenText = isRecord(chunk.message) && typeof chunk.message.content === "string"
+                ? chunk.message.content
+                : chunk.type === "token" && typeof chunk.text === "string"
+                  ? chunk.text
+                  : "";
+              if (tokenText) {
+                if (firstTokenAt === null) {
+                  firstTokenAt = performance.now();
+                  timings.ollamaTimeToFirstTokenMs = Math.round(firstTokenAt - ollamaStarted);
+                  console.info("[chat]", requestId, "first Ollama token", {
+                    requestReceivedAt: receivedAt.toISOString(),
+                    preparationMs: timings.preparationMs,
+                    ragMs: timings.ragMs,
+                    ragWaitMs: timings.ragWaitMs,
+                    webSearchMs: timings.webSearchMs,
+                    webSearchWaitMs: timings.webSearchWaitMs,
+                    ollamaConnectMs: timings.ollamaConnectMs,
+                    ollamaTimeToFirstTokenMs: timings.ollamaTimeToFirstTokenMs,
+                  });
+                }
+                sendEvent(controller, { type: "token", text: tokenText });
+              }
+
+              if (chunk.done === true || chunk.type === "done") {
+                receivedDone = true;
+                latestMetadata = metadataFrom(isRecord(chunk.model) ? chunk.model : chunk);
+              }
             }
+            if (cancelled || requestController.signal.aborted) return;
+            if (!receivedDone) throw new Error("Ollama stream ended before the response was complete.");
 
-            if (chunk.done === true || chunk.type === "done") {
-              receivedDone = true;
-              latestMetadata = metadataFrom(isRecord(chunk.model) ? chunk.model : chunk);
-            }
-          };
-
-          while (!cancelled && !requestController.signal.aborted) {
-            const { value, done } = await upstreamReader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-            for (const line of lines) processLine(line);
-          }
-          buffer += decoder.decode();
-          if (buffer.trim()) processLine(buffer);
-          if (cancelled || requestController.signal.aborted) return;
-          if (!receivedDone) throw new Error("Ollama stream ended before the response was complete.");
-
-          const totalMs = Math.round(performance.now() - requestStarted);
-          const modelMetrics = {
-            ...latestMetadata,
-            ollamaTotalMs: millis(latestMetadata.total_duration),
-            modelLoadMs: millis(latestMetadata.load_duration),
-            promptEvaluationMs: millis(latestMetadata.prompt_eval_duration),
-            generationEvaluationMs: millis(latestMetadata.eval_duration),
-            generatedTokensPerSecond: latestMetadata.eval_count && latestMetadata.eval_duration
-              ? Math.round(latestMetadata.eval_count / (latestMetadata.eval_duration / 1_000_000_000) * 10) / 10
-              : undefined,
-          };
-          console.info("[chat]", requestId, "completed", {
-            requestReceivedAt: receivedAt.toISOString(),
-            ...timings,
-            ...modelMetrics,
-            totalMs,
-          });
-          sendEvent(controller, { type: "done", requestId, timings, model: modelMetrics, totalMs });
-          controller.close();
-        } catch (error) {
-          if (cancelled || requestController.signal.aborted) return;
-          const totalMs = Math.round(performance.now() - requestStarted);
-          console.error("[chat]", requestId, "stream failed:", error, { ...timings, totalMs });
-          sendEvent(controller, {
-            type: "error",
-            requestId,
-            timings: {
+            const totalMs = Math.round(performance.now() - requestStarted);
+            const modelMetrics = {
+              ...latestMetadata,
+              ollamaTotalMs: millis(latestMetadata.total_duration),
+              modelLoadMs: millis(latestMetadata.load_duration),
+              promptEvaluationMs: millis(latestMetadata.prompt_eval_duration),
+              generationEvaluationMs: millis(latestMetadata.eval_duration),
+              generatedTokensPerSecond: latestMetadata.eval_count && latestMetadata.eval_duration
+                ? Math.round(latestMetadata.eval_count / (latestMetadata.eval_duration / 1_000_000_000) * 10) / 10
+                : undefined,
+            };
+            console.info("[chat]", requestId, "completed", {
+              requestReceivedAt: receivedAt.toISOString(),
               ...timings,
-              preparationMs: timings.preparationMs ?? Math.round(performance.now() - requestStarted),
+              ...modelMetrics,
               totalMs,
-              timeToFirstTokenMs: firstTokenAt === null
-                ? undefined
-                : Math.round(firstTokenAt - requestStarted),
-            },
-            message: error instanceof Error ? error.message : "The assistant could not complete the response.",
-          });
-          controller.close();
-        } finally {
-          request.signal.removeEventListener("abort", abortRequest);
-          if (upstreamReader) {
-            await upstreamReader.cancel().catch(() => undefined);
-            upstreamReader.releaseLock();
+            });
+            sendEvent(controller, { type: "done", requestId, timings, model: modelMetrics, totalMs });
+            controller.close();
+          } catch (error) {
+            if (cancelled || requestController.signal.aborted) return;
+            const totalMs = Math.round(performance.now() - requestStarted);
+            console.error("[chat]", requestId, "stream failed:", error, { ...timings, totalMs });
+            sendEvent(controller, {
+              type: "error",
+              requestId,
+              timings: {
+                ...timings,
+                totalMs,
+                timeToFirstTokenMs: firstTokenAt === null
+                  ? undefined
+                  : Math.round(firstTokenAt - requestStarted),
+              },
+              message: error instanceof Error ? error.message : "The assistant could not complete the response.",
+            });
+            controller.close();
+          } finally {
+            releaseRequestListener();
           }
-        }
-      })();
-    },
-    async cancel(reason) {
-      cancelled = true;
-      requestController.abort(reason);
-      if (upstreamReader) await upstreamReader.cancel(reason).catch(() => undefined);
-    },
-  });
+        })();
+      },
+      cancel(reason) {
+        cancelled = true;
+        requestController.abort(reason);
+      },
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no",
-      "X-Request-ID": requestId,
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+        "X-Request-ID": requestId,
+      },
+    });
+  } catch (error) {
+    releaseRequestListener();
+    if (requestController.signal.aborted) return new Response(null, { status: 499 });
+    console.error("[chat]", requestId, "Chat request preparation failed:", error);
+    return NextResponse.json({ error: "The assistant could not prepare this request." }, { status: 500 });
+  }
 }

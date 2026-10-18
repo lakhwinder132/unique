@@ -27,6 +27,35 @@ time zone. Forecast data is model output, not live radar, and variable coverage
 depends on location. Open-Meteo attribution is shown with the forecast.
 Check Open-Meteo's current terms for the intended commercial use and deployment.
 
+## Ollama chat configuration
+
+The chat API requires `OLLAMA_URL` in the server runtime environment. It must be
+the Ollama base URL; the route appends `/api/chat`. The public app domain
+(`https://ai.shelly22.online`) is the browser-facing frontend/API origin, not the
+Ollama URL. The browser posts to the app's relative `/api/chat` route, and that
+server route makes a separate request to Ollama.
+
+For local development, set `OLLAMA_URL` in `apps/web/.env` or
+`apps/web/.env.local` to the VM's public Ollama address:
+
+```env
+OLLAMA_URL=http://<VM_PUBLIC_IP>:11434
+```
+
+When the app runs in Docker on the VM, use the Docker-reachable Ollama base URL
+in `/etc/ollama-farmer.env` (for example, the host gateway address verified
+from inside that deployment):
+
+```env
+OLLAMA_URL=<Docker-reachable Ollama base URL>
+```
+
+Keep this machine-specific setting in the VM environment file, not source
+control. The deployment workflow passes this file to Docker at runtime. Do not
+set `OLLAMA_URL` to `https://ai.shelly22.online`: that domain routes to the app's
+`/api/chat` endpoint and would make the server call its own chat route instead
+of Ollama.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
