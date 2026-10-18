@@ -119,12 +119,15 @@ export async function askOllama({
   let completed = false;
 
   const processEvent = (rawEvent: string) => {
-    const data = rawEvent
-      .replace(/\r\n/g, "\n")
+    let data = rawEvent
+      .replace(/\r\n?/g, "\n")
       .split("\n")
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trimStart())
       .join("\n");
+    while (data.startsWith("data:")) {
+      data = data.slice(5).trimStart();
+    }
     if (!data) return;
 
     let event: StreamEvent;
@@ -162,11 +165,11 @@ export async function askOllama({
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let separator = /\r?\n\r?\n/.exec(buffer);
+      let separator = /(?:\r\n|\r|\n){2}/.exec(buffer);
       while (separator?.index !== undefined) {
         processEvent(buffer.slice(0, separator.index));
         buffer = buffer.slice(separator.index + separator[0].length);
-        separator = /\r?\n\r?\n/.exec(buffer);
+        separator = /(?:\r\n|\r|\n){2}/.exec(buffer);
       }
     }
     buffer += decoder.decode();

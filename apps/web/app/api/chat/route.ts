@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { detectTextLanguage } from "../../services/language";
 import { retrieveRagContext, type RagPayload } from "./rag-worker";
 
-const OLLAMA_URL = (process.env.OLLAMA_URL ?? "https://ai.shelly22.online").replace(/\/+$/, "");
+const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://3.7.66.165:11434").replace(/\/+$/, "");
 const SEARCH_SERVICE_URL = process.env.SEARCH_SERVICE_URL ?? "http://3.108.65.156:3001";
 const MODEL = "qwen3:1.7b";
 const RAG_DEBUG = (process.env.RAG_DEBUG ?? "false").toLowerCase() === "true";
@@ -316,13 +316,29 @@ export async function POST(request: NextRequest) {
           let receivedDone = false;
 
           const processLine = (rawLine: string) => {
-            const line = rawLine.trim();
+            let line = rawLine.trim();
+            while (line.startsWith("data:")) {
+              line = line.slice(5).trimStart();
+            }
             if (!line) return;
+            if (line === "[DONE]") {
+              receivedDone = true;
+              return;
+            }
+
             const chunk: unknown = JSON.parse(line);
             if (!isRecord(chunk)) throw new Error("Ollama returned an invalid stream chunk.");
             if (typeof chunk.error === "string") throw new Error(chunk.error);
+            if (chunk.type === "error") {
+              throw new Error(typeof chunk.message === "string" ? chunk.message : "The model service could not complete the response.");
+            }
 
-            if (isRecord(chunk.message) && typeof chunk.message.content === "string" && chunk.message.content) {
+            const tokenText = isRecord(chunk.message) && typeof chunk.message.content === "string"
+              ? chunk.message.content
+              : chunk.type === "token" && typeof chunk.text === "string"
+                ? chunk.text
+                : "";
+            if (tokenText) {
               if (firstTokenAt === null) {
                 firstTokenAt = performance.now();
                 timings.ollamaTimeToFirstTokenMs = Math.round(firstTokenAt - ollamaStarted);
@@ -337,12 +353,12 @@ export async function POST(request: NextRequest) {
                   ollamaTimeToFirstTokenMs: timings.ollamaTimeToFirstTokenMs,
                 });
               }
-              sendEvent(controller, { type: "token", text: chunk.message.content });
+              sendEvent(controller, { type: "token", text: tokenText });
             }
 
-            if (chunk.done === true) {
+            if (chunk.done === true || chunk.type === "done") {
               receivedDone = true;
-              latestMetadata = metadataFrom(chunk);
+              latestMetadata = metadataFrom(isRecord(chunk.model) ? chunk.model : chunk);
             }
           };
 
