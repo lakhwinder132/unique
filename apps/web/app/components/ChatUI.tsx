@@ -6,20 +6,15 @@ import "./kisan-chat.css";
 import ReactMarkdown from "react-markdown";
 import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
-  ArrowRight,
-  ArrowUpRight,
   AudioLines,
   BookOpenText,
   CloudSun,
   Headphones,
-  Leaf,
   MapPin,
   Menu,
-  MessageCircle,
   Plus,
   Send,
   Sprout,
-  Wheat,
   X,
 } from "lucide-react";
 import { getLanguageName } from "../services/language";
@@ -30,6 +25,7 @@ type ChatUIProps = {
   prompt: string;
   submittedPrompt: string;
   response: string;
+  chatError: string;
   send: boolean;
   listening: boolean;
   voiceMode: boolean;
@@ -59,22 +55,17 @@ type ChatUIProps = {
 };
 
 const navigation = [
-  { label: "Crop advisory", icon: Sprout, prompt: "Can you give me practical crop advisory for my farm?" },
-  { label: "Weather", icon: CloudSun, prompt: "What weather should I plan around for my farm this week?" },
-  { label: "Mandi rates", icon: Wheat, prompt: "What should I know about today's mandi rates before selling my crop?" },
-  { label: "Farming knowledge", icon: BookOpenText, prompt: "Help me learn more about farming practices for my crops." },
-];
-
-const recentChats = [
-  "Wheat irrigation schedule",
-  "Yellowing leaves in mustard",
-  "Preparing soil for vegetables",
+  { label: "Crop care", icon: Sprout, prompt: "What details do you need to give useful advice about my crop?" },
+  { label: "Weather & field work", icon: CloudSun, prompt: "Help me understand the weather for planning field work today." },
+  { label: "Soil questions", icon: BookOpenText, prompt: "What should I check before changing my soil or fertilizer plan?" },
+  { label: "Selling a crop", icon: CloudSun, prompt: "What should I verify before selling my crop at the mandi?" },
 ];
 
 export default function ChatUI({
   prompt,
   submittedPrompt,
   response,
+  chatError,
   send,
   listening,
   voiceMode,
@@ -82,14 +73,7 @@ export default function ChatUI({
   speaking,
   speechError,
   speechLanguageChoice,
-  directTestingEnabled,
-  chatMode,
-  directModels,
-  directModel,
-  directStatus,
-  directResponseTime,
   directBusy,
-  directBaseUrl,
   onPromptChange,
   onSubmit,
   onSuggestionSelect,
@@ -98,9 +82,6 @@ export default function ChatUI({
   onWeatherLoaded,
   onSpeechLanguageChange,
   onKeyDown,
-  onChatModeChange,
-  onDirectModelChange,
-  onTestDirectOllama,
 }: ChatUIProps) {
   const messagesContainerRef = useRef<HTMLElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -156,7 +137,7 @@ export default function ChatUI({
         <a className="new-chat-button" href="/"><Plus size={17} strokeWidth={2.2} /><span>New chat</span><span className="new-chat-shortcut">⌘ K</span></a>
 
         <div className="sidebar-section">
-          <p className="sidebar-label">YOUR FARM</p>
+          <p className="sidebar-label">ASK ABOUT</p>
           <nav className="primary-navigation">
             {navigation.map(({ label, icon: Icon, prompt: navigationPrompt }) => (
               <button className={`navigation-link${activeNavigation === label ? " is-active" : ""}`} type="button" key={label} onClick={() => choosePrompt(navigationPrompt, label)}>
@@ -166,25 +147,17 @@ export default function ChatUI({
           </nav>
         </div>
 
-        <div className="sidebar-section recent-section">
-          <div className="recent-heading"><p className="sidebar-label">RECENT CHATS</p><button type="button" aria-label="More chat history"><ArrowRight size={14} /></button></div>
-          <div className="recent-list">
-            {recentChats.map((chat) => <button className="recent-chat" type="button" key={chat} onClick={() => choosePrompt(chat)}><MessageCircle size={15} strokeWidth={1.75} /><span>{chat}</span></button>)}
-          </div>
-        </div>
-
         <div className="sidebar-bottom">
-          <div className="sidebar-season"><span className="season-icon"><Leaf size={16} /></span><span><small>IN SEASON</small><strong>Rabi · Punjab</strong></span><ArrowUpRight size={14} /></div>
-          <div className="farmer-profile"><span className="profile-avatar">PS</span><span className="profile-copy"><strong>Punjab grower</strong><small>Farmer account</small></span><span className="profile-menu" aria-hidden="true">···</span></div>
+          <div className="sidebar-language-note"><BookOpenText size={17} aria-hidden="true" /><p>Ask in English, Punjabi, or Hindi.</p></div>
         </div>
       </aside>
 
       <section className="chat-workspace">
         <header className="chat-header">
-          <div className="header-leading"><button className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation menu"><Menu size={20} /></button><span className="header-page-title">Your farm assistant</span></div>
+          <div className="header-leading"><button className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation menu"><Menu size={20} /></button><span className="header-page-title">Farm assistant</span></div>
           <div className="header-tools">
             <span className="location-pill"><MapPin size={14} /><span>{weatherLocation || "Farm weather"}</span></span><span className="header-divider" />
-            <label className="language-select" htmlFor="speech-language"><span>Language</span>
+            <label className="language-select" htmlFor="speech-language"><span>Voice language</span>
               <select id="speech-language" value={speechLanguageChoice} onChange={onSpeechLanguageChange} disabled={voiceMode || send}>
                 <option value="auto">Auto-detect</option><option value="pa">Punjabi</option><option value="hi">Hindi</option><option value="en">English</option>
               </select>
@@ -196,8 +169,8 @@ export default function ChatUI({
           const container = event.currentTarget;
           shouldAutoScrollRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 96;
         }}>
-          {!response && !send && (
-            <section className="welcome weather-home-welcome" aria-label="Punjabi farm weather">
+          {!response && !send && !chatError && (
+            <section className="welcome weather-home-welcome" aria-label="Local farm weather">
               <WeatherWidget language={speechLanguageChoice === "auto" ? language ?? "en" : speechLanguageChoice} onWeatherLoaded={(weather) => {
                 setWeatherLocation([weather.location, weather.country].filter(Boolean).join(", "));
                 onWeatherLoaded(weather);
@@ -205,15 +178,18 @@ export default function ChatUI({
             </section>
           )}
 
-          {(send || response) && <div className="message user-message"><div className="message-body"><div className="message-name">You</div><div className="message-text">{submittedPrompt}</div></div></div>}
+          {(send || response || chatError) && <div className="message user-message"><div className="message-body"><div className="message-name">You</div><div className="message-text">{submittedPrompt}</div></div></div>}
 
-          {(response || send) && (
+          {(response || send || chatError) && (
             <div className="message ai-message">
               <div className="avatar ai-avatar" aria-hidden="true"><Sprout size={19} /></div>
               <div className="message-body">
                 <div className="message-name">Kisan AI <span>FARM ASSISTANT</span></div>
                 <div className="message-text" aria-live="polite">
-                  {response ? <><ReactMarkdown>{response}</ReactMarkdown><button type="button" className="speak-button" onClick={onSpeak} disabled={send} aria-label={speaking ? "Stop audio" : "Listen to answer"}><Headphones size={16} />{speaking ? "Stop audio" : "Listen to answer"}</button></> : <div className="thinking" role="status"><span /><span /><span /><p>Finding helpful guidance…</p></div>}
+                  {response && <ReactMarkdown>{response}</ReactMarkdown>}
+                  {send && !response && <div className="thinking" role="status"><span /><span /><span /><p>Finding helpful guidance…</p></div>}
+                  {response && !chatError && <button type="button" className="speak-button" onClick={onSpeak} disabled={send} aria-label={speaking ? "Stop audio" : "Listen to answer"}><Headphones size={16} />{speaking ? "Stop audio" : "Listen to answer"}</button>}
+                  {chatError && <div className="chat-error" role="alert"><p>{chatError}</p><button type="button" onClick={() => onSubmit(submittedPrompt)} disabled={send}>Try again</button></div>}
                 </div>
               </div>
             </div>
@@ -221,39 +197,6 @@ export default function ChatUI({
         </main>
 
         <footer className="chat-input-area">
-          {directTestingEnabled && (
-            <section className="direct-ollama-panel" aria-label="Direct Ollama test controls">
-              <div className="direct-ollama-controls">
-                <label>
-                  <span>Chat connection</span>
-                  <select value={chatMode} onChange={onChatModeChange} disabled={send || directBusy || voiceMode}>
-                    <option value="backend">Farmer AI backend</option>
-                    <option value="direct">Direct remote Ollama (test)</option>
-                  </select>
-                </label>
-                {chatMode === "direct" && (
-                  <>
-                    <label>
-                      <span>Ollama model</span>
-                      <select value={directModel} onChange={onDirectModelChange} disabled={send || directBusy || !directModels.length}>
-                        <option value="">Test connection to list models</option>
-                        {directModels.map((model) => <option value={model} key={model}>{model}</option>)}
-                      </select>
-                    </label>
-                    <button type="button" onClick={onTestDirectOllama} disabled={send || directBusy}>
-                      {directBusy ? "Connecting…" : "Test / list models"}
-                    </button>
-                  </>
-                )}
-              </div>
-              {chatMode === "direct" && (
-                <p className="direct-ollama-status" role="status" aria-live="polite">
-                  {directStatus || `Direct requests go to ${directBaseUrl || "NEXT_PUBLIC_OLLAMA_TEST_URL (not configured)"}`}
-                  {directResponseTime !== null && ` · ${directResponseTime} ms`}
-                </p>
-              )}
-            </section>
-          )}
           <div className="composer-wrap">
             <div className="composer-label"><span className="composer-mark"><Sprout size={14} /></span><span>Ask Kisan AI</span><span className="composer-language">{language ? getLanguageName(language) : "Ready when you are"}</span></div>
             <div className="chat-input-wrapper">

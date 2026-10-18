@@ -163,6 +163,7 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [response, setResponse] = useState("");
+  const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [send, setSend] = useState(false);
   const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
@@ -196,6 +197,18 @@ export default function App() {
     speechRequestController.current?.abort();
     speechController.current?.abort();
     voiceModeRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    let savedLanguage: string | null = null;
+    try {
+      savedLanguage = window.localStorage.getItem("kisan-ai-language");
+    } catch {
+      return;
+    }
+    if (savedLanguage === "auto" || savedLanguage === "pa" || savedLanguage === "hi" || savedLanguage === "en") {
+      setSpeechLanguageChoice(savedLanguage);
+    }
   }, []);
 
   // ============================================
@@ -261,6 +274,7 @@ export default function App() {
     setSpeaking(false);
     setSubmittedPrompt(question);
     setPrompt("");
+    setChatError("");
 
     setSend(true);
     setResponse("");
@@ -272,10 +286,9 @@ export default function App() {
       const message = error instanceof Error
         ? error.message
         : "The assistant could not be reached. Check your connection and try again.";
+      setChatError(message);
+      setPrompt(question);
       if (chatMode === "direct") setDirectStatus(`Request failed: ${message}`);
-      setResponse((current) => current
-        ? `${current}\n\n**The response was interrupted:** ${message}`
-        : message);
     } finally {
       setSend(false);
     }
@@ -500,6 +513,7 @@ export default function App() {
       prompt={prompt}
       submittedPrompt={submittedPrompt}
       response={response}
+      chatError={chatError}
       send={send}
 
       onPromptChange={handleChange}
@@ -520,7 +534,15 @@ export default function App() {
       onVoiceInput={() => handleVoiceInput()}
       onWeatherLoaded={setWeatherData}
       speechLanguageChoice={speechLanguageChoice}
-      onSpeechLanguageChange={(event) => setSpeechLanguageChoice(event.target.value)}
+      onSpeechLanguageChange={(event) => {
+        const choice = event.target.value;
+        setSpeechLanguageChoice(choice);
+        try {
+          window.localStorage.setItem("kisan-ai-language", choice);
+        } catch {
+          return;
+        }
+      }}
       directTestingEnabled={directTestingEnabled}
       chatMode={chatMode}
       directModels={directModels}
