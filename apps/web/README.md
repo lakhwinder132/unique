@@ -35,12 +35,33 @@ the Ollama base URL; the route appends `/api/chat`. The public app domain
 Ollama URL. The browser posts to the app's relative `/api/chat` route, and that
 server route makes a separate request to Ollama.
 
-For local development, set `OLLAMA_URL` in `apps/web/.env` or
-`apps/web/.env.local` to the VM's public Ollama address:
+For local development using the existing server-side backend, set `OLLAMA_URL`
+in `apps/web/.env` or `apps/web/.env.local` to the Ollama base URL reachable by
+the Next.js process:
 
 ```env
 OLLAMA_URL=http://<VM_PUBLIC_IP>:11434
 ```
+
+### Direct remote Ollama testing (development only)
+
+The development UI also provides a **Direct remote Ollama (test)** mode. It
+calls Ollama from the browser using `/api/tags` and `/api/generate`, lists
+installed models, and streams responses directly into the chat. Configure its
+public test endpoint locally:
+
+```env
+NEXT_PUBLIC_OLLAMA_TEST_URL=http://<VM_PUBLIC_IP>:11434
+```
+
+Restart the Next.js dev server after changing environment variables. This mode
+is hidden in production builds and the endpoint value is public browser
+configuration, not a secret. Direct browser access requires Ollama to allow the
+local page origin (for example `http://localhost:3000`) with `OLLAMA_ORIGINS`.
+It also requires network access to port 11434. Do not expose an unauthenticated
+Ollama API to the whole internet: restrict inbound access to a trusted client IP
+or use an authenticated HTTPS proxy. The direct testing mode is not a
+production architecture.
 
 When the app runs in Docker on the VM, use the Docker-reachable Ollama base URL
 in `/etc/ollama-farmer.env` (for example, the host gateway address verified

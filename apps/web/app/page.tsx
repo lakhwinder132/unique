@@ -12,12 +12,15 @@ import ChatUI from "./components/ChatUI";
 import type { WeatherData } from "./services/weather";
 
 import { askOllama } from "./services/ollama";
+import { generateDirectOllama, listDirectOllamaModels } from "./services/directOllama";
 import { detectTextLanguage } from "./services/language";
 import { recordAudio } from "./speech/speechRecorder";
 
 import "./app.css";
 
 const weatherQuestionPattern = /\b(weather|forecast|rain|rainfall|temperature|wind|windy|humidity|heat|cold|storm|cloud|spray|irrigat|mausam|barish|baarish|meeh|garmi|thand|hawa)\b|मौसम|बारिश|वर्षा|तापमान|हवा|आर्द्रता|तूफान|ਮੌਸਮ|ਮੀਂਹ|ਬਾਰਿਸ਼|ਤਾਪਮਾਨ|ਹਵਾ|ਨਮੀ|ਤੂਫ਼ਾਨ/i;
+const directTestingEnabled = process.env.NODE_ENV !== "production";
+const directOllamaBaseUrl = process.env.NEXT_PUBLIC_OLLAMA_TEST_URL?.trim() ?? "";
 
 function buildWeatherContext(weather: WeatherData, question: string) {
   const asksForRain = /rain|precip|shower|irrigat|water|meeh|ਮੀਂਹ|ਬਾਰਿਸ਼|बारिश|वर्षा|सਿੰਚਾਈ/i.test(question);
@@ -162,6 +165,12 @@ export default function App() {
   const [response, setResponse] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [send, setSend] = useState(false);
+  const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
+  const [directModels, setDirectModels] = useState<string[]>([]);
+  const [directModel, setDirectModel] = useState("");
+  const [directStatus, setDirectStatus] = useState("");
+  const [directResponseTime, setDirectResponseTime] = useState<number | null>(null);
+  const [directBusy, setDirectBusy] = useState(false);
 
   // ============================================
   // NEW VOICE STATES
@@ -201,6 +210,21 @@ export default function App() {
   };
 
   const getAnswer = async (question: string) => {
+    if (chatMode === "direct") {
+      if (!directModel) throw new Error("Test the connection and select an installed Ollama model first.");
+      setDirectStatus(`Generating with ${directModel}…`);
+      setDirectResponseTime(null);
+      const result = await generateDirectOllama({
+        baseUrl: directOllamaBaseUrl,
+        model: directModel,
+        prompt: question,
+        onChunk: setResponse,
+      });
+      setDirectResponseTime(result.elapsedMs);
+      setDirectStatus(`Generated with ${directModel}`);
+      return result.text;
+    }
+
     const weatherQuestion = weatherQuestionPattern.test(question);
     const weatherContext = weatherQuestion
       ? weatherData
@@ -225,7 +249,7 @@ export default function App() {
 
   const handleSubmit = async (voiceQuestion?: string) => {
     const question = (voiceQuestion ?? prompt).trim();
-    if (!question || send) {
+    if (!question || send || directBusy) {
       return;
     }
 
@@ -248,11 +272,36 @@ export default function App() {
       const message = error instanceof Error
         ? error.message
         : "The assistant could not be reached. Check your connection and try again.";
+      if (chatMode === "direct") setDirectStatus(`Request failed: ${message}`);
       setResponse((current) => current
         ? `${current}\n\n**The response was interrupted:** ${message}`
         : message);
     } finally {
       setSend(false);
+    }
+  };
+
+  const handleTestDirectOllama = async () => {
+    if (send || directBusy) return;
+    setDirectBusy(true);
+    setDirectStatus("Checking Ollama and retrieving installed models…");
+    setDirectResponseTime(null);
+    const startedAt = performance.now();
+    try {
+      const models = await listDirectOllamaModels(directOllamaBaseUrl);
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      const modelNames = models.map(({ name }) => name);
+      setDirectModels(modelNames);
+      setDirectModel((current) => modelNames.includes(current) ? current : modelNames[0] ?? "");
+      setDirectResponseTime(elapsedMs);
+      setDirectStatus(`Connected · ${modelNames.length} model${modelNames.length === 1 ? "" : "s"} available`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Direct Ollama connection failed.";
+      setDirectModels([]);
+      setDirectModel("");
+      setDirectStatus(`Connection failed: ${message}`);
+    } finally {
+      setDirectBusy(false);
     }
   };
 
@@ -265,7 +314,8 @@ export default function App() {
   ) => {
     if (
       e.key === "Enter" &&
-      !send
+      !send &&
+      !directBusy
     ) {
       handleSubmit();
     }
@@ -471,6 +521,17 @@ export default function App() {
       onWeatherLoaded={setWeatherData}
       speechLanguageChoice={speechLanguageChoice}
       onSpeechLanguageChange={(event) => setSpeechLanguageChoice(event.target.value)}
+      directTestingEnabled={directTestingEnabled}
+      chatMode={chatMode}
+      directModels={directModels}
+      directModel={directModel}
+      directStatus={directStatus}
+      directResponseTime={directResponseTime}
+      directBusy={directBusy}
+      directBaseUrl={directOllamaBaseUrl}
+      onChatModeChange={(event) => setChatMode(event.target.value === "direct" ? "direct" : "backend")}
+      onDirectModelChange={(event) => setDirectModel(event.target.value)}
+      onTestDirectOllama={() => void handleTestDirectOllama()}
     />
     
   );

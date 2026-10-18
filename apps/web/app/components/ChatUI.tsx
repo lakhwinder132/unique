@@ -37,6 +37,14 @@ type ChatUIProps = {
   speaking: boolean;
   speechError: string;
   speechLanguageChoice: string;
+  directTestingEnabled: boolean;
+  chatMode: "backend" | "direct";
+  directModels: string[];
+  directModel: string;
+  directStatus: string;
+  directResponseTime: number | null;
+  directBusy: boolean;
+  directBaseUrl: string;
   onWeatherLoaded: (weather: WeatherData) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (prompt?: string) => void;
@@ -45,6 +53,9 @@ type ChatUIProps = {
   onSpeak: () => void;
   onSpeechLanguageChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  onChatModeChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  onDirectModelChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  onTestDirectOllama: () => void;
 };
 
 const navigation = [
@@ -71,6 +82,14 @@ export default function ChatUI({
   speaking,
   speechError,
   speechLanguageChoice,
+  directTestingEnabled,
+  chatMode,
+  directModels,
+  directModel,
+  directStatus,
+  directResponseTime,
+  directBusy,
+  directBaseUrl,
   onPromptChange,
   onSubmit,
   onSuggestionSelect,
@@ -79,6 +98,9 @@ export default function ChatUI({
   onWeatherLoaded,
   onSpeechLanguageChange,
   onKeyDown,
+  onChatModeChange,
+  onDirectModelChange,
+  onTestDirectOllama,
 }: ChatUIProps) {
   const messagesContainerRef = useRef<HTMLElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -199,12 +221,45 @@ export default function ChatUI({
         </main>
 
         <footer className="chat-input-area">
+          {directTestingEnabled && (
+            <section className="direct-ollama-panel" aria-label="Direct Ollama test controls">
+              <div className="direct-ollama-controls">
+                <label>
+                  <span>Chat connection</span>
+                  <select value={chatMode} onChange={onChatModeChange} disabled={send || directBusy || voiceMode}>
+                    <option value="backend">Farmer AI backend</option>
+                    <option value="direct">Direct remote Ollama (test)</option>
+                  </select>
+                </label>
+                {chatMode === "direct" && (
+                  <>
+                    <label>
+                      <span>Ollama model</span>
+                      <select value={directModel} onChange={onDirectModelChange} disabled={send || directBusy || !directModels.length}>
+                        <option value="">Test connection to list models</option>
+                        {directModels.map((model) => <option value={model} key={model}>{model}</option>)}
+                      </select>
+                    </label>
+                    <button type="button" onClick={onTestDirectOllama} disabled={send || directBusy}>
+                      {directBusy ? "Connecting…" : "Test / list models"}
+                    </button>
+                  </>
+                )}
+              </div>
+              {chatMode === "direct" && (
+                <p className="direct-ollama-status" role="status" aria-live="polite">
+                  {directStatus || `Direct requests go to ${directBaseUrl || "NEXT_PUBLIC_OLLAMA_TEST_URL (not configured)"}`}
+                  {directResponseTime !== null && ` · ${directResponseTime} ms`}
+                </p>
+              )}
+            </section>
+          )}
           <div className="composer-wrap">
             <div className="composer-label"><span className="composer-mark"><Sprout size={14} /></span><span>Ask Kisan AI</span><span className="composer-language">{language ? getLanguageName(language) : "Ready when you are"}</span></div>
             <div className="chat-input-wrapper">
-              <input type="text" placeholder={listening ? "Listening… speak now" : "Ask about your crops, soil, pests…"} value={prompt} onChange={onPromptChange} onKeyDown={onKeyDown} disabled={send || listening || voiceMode} aria-label="Ask Kisan AI a farming question" />
-              <button className={`voice-button${listening ? " listening" : ""}`} type="button" onClick={onVoiceInput} disabled={send && !voiceMode} aria-label={voiceMode ? "Stop voice conversation" : "Start voice conversation"} title={voiceMode ? "Stop voice conversation" : "Voice input"}>{voiceMode ? <X size={17} /> : <AudioLines size={17} />}<span>{voiceMode ? "Stop" : listening ? "Listening" : "Voice"}</span></button>
-              <button className="send-button" type="button" onClick={() => onSubmit()} disabled={send || voiceMode || !prompt.trim()} aria-label="Send message" title="Send message">{send ? <span className="send-spinner" /> : <Send size={18} strokeWidth={2} />}</button>
+              <input type="text" placeholder={listening ? "Listening… speak now" : "Ask about your crops, soil, pests…"} value={prompt} onChange={onPromptChange} onKeyDown={onKeyDown} disabled={send || directBusy || listening || voiceMode} aria-label="Ask Kisan AI a farming question" />
+              <button className={`voice-button${listening ? " listening" : ""}`} type="button" onClick={onVoiceInput} disabled={directBusy || (send && !voiceMode)} aria-label={voiceMode ? "Stop voice conversation" : "Start voice conversation"} title={voiceMode ? "Stop voice conversation" : "Voice input"}>{voiceMode ? <X size={17} /> : <AudioLines size={17} />}<span>{voiceMode ? "Stop" : listening ? "Listening" : "Voice"}</span></button>
+              <button className="send-button" type="button" onClick={() => onSubmit()} disabled={send || directBusy || voiceMode || !prompt.trim()} aria-label="Send message" title="Send message">{send ? <span className="send-spinner" /> : <Send size={18} strokeWidth={2} />}</button>
             </div>
           </div>
           <div className="input-meta">

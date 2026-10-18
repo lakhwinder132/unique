@@ -29,6 +29,27 @@ type OllamaOptions = {
   signal?: AbortSignal;
 };
 
+// randomUUID is unavailable in some browsers and on non-secure origins.
+// Request IDs are for tracing only, so retain a UUID-shaped fallback there.
+function createRequestId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -50,7 +71,7 @@ export async function askOllama({
   signal,
 }: OllamaOptions) {
   const startedAt = performance.now();
-  const requestId = crypto.randomUUID();
+  const requestId = createRequestId();
   let headersAt = startedAt;
   let firstBackendEventAt: number | null = null;
   let firstVisibleTextAt: number | null = null;

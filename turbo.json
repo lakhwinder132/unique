@@ -19,7 +19,8 @@
       "env": [
         "TAVILY_API_KEY",
         "BHASHINI_INFERENCE_KEY",
-        "OLLAMA_URL"
+        "OLLAMA_URL",
+        "NEXT_PUBLIC_OLLAMA_TEST_URL"
       ]
     },
     "start": {
