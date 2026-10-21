@@ -279,9 +279,6 @@ export default function ChatUI({
             </div>
           </div>
           <div className="input-meta">
-            {process.env.NODE_ENV === "production"
-              ? <p className="activity-local-notice">{automaticActivityLoggingCopy[uiLanguage]}</p>
-              : <p className="activity-local-notice">{localActivityLoggingCopy[uiLanguage]}</p>}
             {voiceMode && <p className="voice-mode-status" aria-live="polite">{listening ? copy.listening : send ? copy.thinking : speaking ? (uiLanguage === "pa" ? "ਬੋਲ ਰਹੇ ਹਾਂ…" : uiLanguage === "hi" ? "बोल रहे हैं…" : "Speaking…") : uiLanguage === "pa" ? "ਆਵਾਜ਼ੀ ਗੱਲਬਾਤ ਚਾਲੂ ਹੈ" : uiLanguage === "hi" ? "आवाज़ बातचीत चालू है" : "Voice conversation active"}</p>}
             {speechError && <p className="speech-error" role="status">{speechError}</p>}
             <p className="input-hint">{copy.mistakes}</p>
