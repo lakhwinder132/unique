@@ -20,6 +20,8 @@
         "TAVILY_API_KEY",
         "BHASHINI_INFERENCE_KEY",
         "OLLAMA_URL",
+        "ACTIVITY_ADMIN_TOKEN",
+        "ACTIVITY_LOG_DIR",
         "NEXT_PUBLIC_OLLAMA_TEST_URL"
       ]
     },
@@ -29,7 +31,9 @@
       "env": [
         "TAVILY_API_KEY",
         "BHASHINI_INFERENCE_KEY",
-        "OLLAMA_URL"
+        "OLLAMA_URL",
+        "ACTIVITY_ADMIN_TOKEN",
+        "ACTIVITY_LOG_DIR"
       ]
     }
   }
