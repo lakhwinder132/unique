@@ -22,10 +22,10 @@ export async function recordAudio(signal?: AbortSignal): Promise<Blob> {
     throw new Error("This browser does not support microphone recording.");
   }
 
-  const audioContext = new AudioContext({ sampleRate: 16000 });
   let stream: MediaStream;
   try {
-    if (audioContext.state === "suspended") await audioContext.resume();
+    // Ask for access immediately from the microphone button's user gesture.
+    // On mobile browsers, awaiting AudioContext.resume() first can lose that gesture.
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -35,10 +35,29 @@ export async function recordAudio(signal?: AbortSignal): Promise<Blob> {
       },
     });
   } catch (error) {
-    if (audioContext.state !== "closed") await audioContext.close();
     if (error instanceof Error && error.name === "NotAllowedError") {
-      throw new Error("Allow microphone access in your browser settings, then try again.");
+      const userAgent = navigator.userAgent;
+      const isIos = /iPad|iPhone|iPod/.test(userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const isAndroid = /Android/.test(userAgent);
+      const instruction = isIos
+        ? "In iPhone/iPad Settings, allow Microphone access for your browser, then return and try again."
+        : isAndroid
+          ? "In Chrome, tap the site controls beside the address, set Microphone to Allow, then return and try again."
+          : "In your browser's site settings, set Microphone to Allow, then return and try again.";
+      throw new Error(`Microphone permission is blocked. ${instruction}`);
     }
+    if (error instanceof Error && error.name === "NotFoundError") {
+      throw new Error("No microphone was found. Connect or enable a microphone, then try again.");
+    }
+    throw error;
+  }
+
+  const audioContext = new AudioContext({ sampleRate: 16000 });
+  try {
+    if (audioContext.state === "suspended") await audioContext.resume();
+  } catch (error) {
+    stream.getTracks().forEach((track) => track.stop());
+    if (audioContext.state !== "closed") await audioContext.close();
     throw error;
   }
 
