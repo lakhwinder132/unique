@@ -5,8 +5,9 @@ import { getRecentActivity, storeActivity, type ActivityEntry } from "./activity
 export const runtime = "nodejs";
 
 function hasAdminAccess(request: NextRequest) {
-  const expected = process.env.ACTIVITY_ADMIN_TOKEN;
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  const expected = process.env.ACTIVITY_ADMIN_TOKEN?.trim();
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const supplied = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
   if (!expected) return false;
   const expectedBytes = Buffer.from(expected);
   const suppliedBytes = Buffer.from(supplied);

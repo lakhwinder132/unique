@@ -22,7 +22,7 @@ export default function ActivityAdminPage() {
     setError("");
     try {
       const response = await fetch("/api/activity", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token.trim()}` },
         cache: "no-store",
       });
       const data: unknown = await response.json();
