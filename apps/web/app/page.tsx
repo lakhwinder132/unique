@@ -189,6 +189,7 @@ export default function App() {
   const audioUrlRef = useRef<string | null>(null);
   const speechController = useRef<AbortController | null>(null);
   const voiceModeRef = useRef(false);
+  const explainQuestionHandledRef = useRef(false);
 
   useEffect(() => () => {
     audioRef.current?.pause();
@@ -293,6 +294,15 @@ export default function App() {
       setSend(false);
     }
   };
+
+  useEffect(() => {
+    if (explainQuestionHandledRef.current) return;
+    const explainQuestion = new URL(window.location.href).searchParams.get("explain")?.trim();
+    if (!explainQuestion) return;
+    explainQuestionHandledRef.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    void handleSubmit(explainQuestion.slice(0, 3000));
+  }, [handleSubmit]);
 
   const handleTestDirectOllama = async () => {
     if (send || directBusy) return;

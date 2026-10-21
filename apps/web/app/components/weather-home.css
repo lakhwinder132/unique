@@ -551,6 +551,57 @@
   transform: translateY(0);
 }
 
+.weather-home-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.weather-home-tools h3 {
+  flex: 0 0 auto;
+  margin: 0;
+  color: #66776a;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.weather-home-tools-links {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.weather-home-tool-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid #e0e8dc;
+  border-radius: 10px;
+  color: #42694b;
+  background: rgba(255, 255, 252, .82);
+  font-size: 11px;
+  font-weight: 590;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.weather-home-tool-link:hover {
+  border-color: #b7cbb5;
+  background: #f3f7ef;
+}
+
+.weather-home-tool-link svg {
+  flex: 0 0 auto;
+}
+
+#weather-day-title {
+  scroll-margin-top: 20px;
+}
+
 .weather-assistant-arrow {
   display: grid;
   width: 25px;
@@ -774,6 +825,24 @@
     min-height: 48px;
     border-radius: 11px;
     font-size: 13px;
+  }
+
+  .weather-home-tools {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .weather-home-tools-links {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .weather-home-tool-link {
+    min-height: 40px;
+    padding: 0 9px;
+    font-size: 10px;
   }
 
   .weather-home-attribution {
@@ -1079,6 +1148,57 @@
   .weather-home-scene,.weather-hour-item { transition: none; }
 }
 
+/* Four large farm-topic pictures keep the first choices easy to scan and tap. */
+.farm-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.farm-feature-card {
+  display: grid;
+  min-width: 0;
+  min-height: 120px;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4e8df;
+  border-radius: 16px;
+  color: #30483a;
+  background: #fffefa;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.farm-feature-card:hover { transform: translateY(-2px); border-color: #9eb89f; background: #f5f8f1; }
+.farm-feature-card:focus-visible { outline: 3px solid rgba(39,103,73,.35); outline-offset: 3px; }
+.farm-feature-picture {
+  display: grid;
+  width: 66px;
+  height: 66px;
+  place-items: center;
+  border-radius: 19px;
+  color: #315f40;
+  background: #eaf1e5;
+}
+.farm-feature-card.soil .farm-feature-picture { color: #8a6137; background: #f3eadb; }
+.farm-feature-card.market .farm-feature-picture { color: #8b6840; background: #f6efdf; }
+.farm-feature-card.news .farm-feature-picture { color: #477b91; background: #e8f1f3; }
+
+@media (max-width: 700px) {
+  .farm-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .farm-feature-card { min-height: 108px; font-size: 16px; }
+  .farm-feature-picture { width: 58px; height: 58px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .farm-feature-card { transition: none; }
+}
+
 /* Small-screen layout and touch behavior */
 @media (max-width: 700px) {
   .chat-app { min-height: 0; }
@@ -1253,4 +1373,22 @@
 
 @media (prefers-reduced-motion: reduce) {
   .weather-more-details > summary::after { transition: none; }
+}
+
+/* Final touch-target overrides for the persistent voice control. */
+.chat-input-wrapper .voice-button {
+  width: 58px;
+  min-width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: #315f40;
+}
+.chat-input-wrapper .voice-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.chat-input-wrapper .voice-button.listening { color: #fff; background: #a7473e; }
+@media (max-width: 700px) {
+  .chat-input-wrapper { min-height: 64px; }
+  .chat-input-wrapper .voice-button { width: 52px; min-width: 52px; height: 52px; }
+  .chat-input-wrapper input { font-size: 16px; }
 }

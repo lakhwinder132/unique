@@ -10,18 +10,23 @@ import {
   CloudSun,
   Compass,
   Droplets,
+  Layers3,
   MapPin,
   Moon,
+  Newspaper,
   RefreshCw,
   Search,
   Sun,
   Sunrise,
   Sunset,
   Sprout,
+  Scale,
   Thermometer,
   Wind,
+  Wheat,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   isWeatherData,
@@ -755,12 +760,6 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
     scene.style.setProperty("--crop-sway-duration", `${duration}s`);
   }, [windSpeed]);
 
-  const assistantQuestion = language === "pa"
-    ? "ਅੱਜ ਦੇ ਮੌਸਮ ਅਤੇ ਅਗਲੇ ਕੁਝ ਘੰਟਿਆਂ ਵਿੱਚ ਮੀਂਹ ਦੀ ਸੰਭਾਵਨਾ ਦੇ ਆਧਾਰ 'ਤੇ, ਫ਼ਸਲ ਦੀ ਸਿੰਚਾਈ ਅਤੇ ਖੇਤੀ ਦੇ ਕੰਮ ਲਈ ਮੈਨੂੰ ਕੀ ਧਿਆਨ ਰੱਖਣਾ ਚਾਹੀਦਾ ਹੈ?"
-    : language === "hi"
-      ? "आज के मौसम और अगले कुछ घंटों में बारिश की संभावना के आधार पर, फसल की सिंचाई और खेत के काम के लिए मुझे किन बातों का ध्यान रखना चाहिए?"
-      : "Based on the local weather and rain chances over the next few hours, what should I consider for crop irrigation and field work today?";
-
   return (
     <section className="weather-home" aria-label="Local farm weather">
       <div className="weather-home-toolbar">
@@ -864,18 +863,30 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
         )}
       </div>
 
-      <button
-        className="weather-assistant-action"
-        type="button"
-        onClick={() => onAskAssistant(assistantQuestion)}
-      >
-        <span>{copy.ask}</span>
-        <span className="weather-assistant-arrow" aria-hidden="true">↗</span>
-      </button>
+      <nav className="farm-feature-grid" aria-label={language === "pa" ? "ਖੇਤੀ ਦੇ ਵਿਸ਼ੇ" : language === "hi" ? "खेती के विषय" : "Farm topics"}>
+        <button className="farm-feature-card crop" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮੇਰੀ ਫ਼ਸਲ ਦੀ ਦੇਖਭਾਲ ਵਿੱਚ ਮਦਦ ਕਰੋ।" : language === "hi" ? "मेरी फसल की देखभाल में मदद करें।" : "Help me care for my crop.")}>
+          <span className="farm-feature-picture"><Wheat size={35} strokeWidth={1.7} aria-hidden="true" /></span>
+          <span>{language === "pa" ? "ਫ਼ਸਲ" : language === "hi" ? "फसल" : "Crop"}</span>
+        </button>
+        <button className="farm-feature-card soil" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮਿੱਟੀ ਬਾਰੇ ਮੇਰੀ ਮਦਦ ਕਰੋ।" : language === "hi" ? "मिट्टी के बारे में मेरी मदद करें।" : "Help me understand my soil.")}>
+          <span className="farm-feature-picture"><Layers3 size={35} strokeWidth={1.7} aria-hidden="true" /></span>
+          <span>{language === "pa" ? "ਮਿੱਟੀ" : language === "hi" ? "मिट्टी" : "Soil"}</span>
+        </button>
+        <button className="farm-feature-card market" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮੇਰੀ ਫ਼ਸਲ ਵੇਚਣ ਤੋਂ ਪਹਿਲਾਂ ਕੀ ਜਾਂਚਣਾ ਚਾਹੀਦਾ ਹੈ?" : language === "hi" ? "फसल बेचने से पहले मुझे क्या जाँचना चाहिए?" : "What should I check before selling my crop?")}>
+          <span className="farm-feature-picture"><Scale size={35} strokeWidth={1.7} aria-hidden="true" /></span>
+          <span>{language === "pa" ? "ਫ਼ਸਲ ਵੇਚੋ" : language === "hi" ? "फसल बेचें" : "Sell crop"}</span>
+        </button>
+        <Link className="farm-feature-card news" href="/news">
+          <span className="farm-feature-picture"><Newspaper size={35} strokeWidth={1.7} aria-hidden="true" /></span>
+          <span>{language === "pa" ? "ਖ਼ਬਰਾਂ" : language === "hi" ? "खबरें" : "Farm news"}</span>
+        </Link>
+      </nav>
 
       {weather && (
         <div className="weather-full-report">
-          <section className="weather-day-section" aria-labelledby="weather-day-title">
+          <details className="weather-more-details">
+            <summary>{language === "pa" ? "ਘੰਟੇਵਾਰ ਮੌਸਮ ਅਤੇ ਹੋਰ ਜਾਣਕਾਰੀ" : language === "hi" ? "घंटेवार मौसम और दूसरी जानकारी" : "See hourly forecast and details"}</summary>
+            <section className="weather-day-section" aria-labelledby="weather-day-title">
             <div className="weather-section-heading weather-day-heading">
               <div>
                 <p className="weather-section-kicker">LOCAL TIME · {weather.timezoneAbbreviation || weather.timezone}</p>
@@ -904,10 +915,8 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
               <p className="weather-chart-unavailable">No hourly values are available for the selected location's local day.</p>
             )}
             <p className="weather-timeline-hint">Scroll along the timeline to explore the full day. The highlighted hour is now.</p>
-          </section>
+            </section>
 
-          <details className="weather-more-details">
-            <summary>{language === "pa" ? "ਚਾਰਟ ਅਤੇ ਹੋਰ ਮੌਸਮੀ ਜਾਣਕਾਰੀ" : language === "hi" ? "चार्ट और मौसम की अन्य जानकारी" : "Charts and more weather details"}</summary>
           <DailyWeatherChart
             hours={dayHours}
             timezone={weather.timezone}
@@ -1001,7 +1010,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
               <small>Weather readings do not include crop condition or soil moisture, so this note describes the forecast only.</small>
             </div>
             {dailyRain !== null && <div className="farm-weather-note-total"><span>MODELLED DAILY PRECIPITATION</span><strong>{formatMeasure(dailyRain, dailyRainUnit, 1)}</strong></div>}
-          </section>
+            </section>
           </details>
         </div>
       )}

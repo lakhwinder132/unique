@@ -4,14 +4,15 @@ import "./fieldwise.css";
 import "./kisan-chat.css";
 
 import ReactMarkdown from "react-markdown";
+import HomeStatusPanel, { BatteryDisplay } from "./HomeStatusPanel";
 import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
   AudioLines,
   BookOpenText,
   CloudSun,
   Headphones,
-  MapPin,
   Menu,
+  Newspaper,
   Plus,
   Send,
   Sprout,
@@ -62,9 +63,9 @@ const navigation = [
 ];
 
 const interfaceCopy = {
-  pa: { home: "ਕਿਸਾਨ AI ਮੁੱਖ ਪੰਨਾ", tagline: "ਤੁਹਾਡਾ ਖੇਤ, ਸਾਡੀ ਦੇਖਭਾਲ", newChat: "ਨਵੀਂ ਗੱਲਬਾਤ", askAbout: "ਇਸ ਬਾਰੇ ਪੁੱਛੋ", topics: ["ਫ਼ਸਲ ਦੀ ਦੇਖਭਾਲ", "ਮੌਸਮ ਅਤੇ ਖੇਤ ਦਾ ਕੰਮ", "ਮਿੱਟੀ ਬਾਰੇ ਸਵਾਲ", "ਫ਼ਸਲ ਵੇਚਣਾ"], languageNote: "ਪੰਜਾਬੀ, ਹਿੰਦੀ ਜਾਂ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਪੁੱਛੋ", assistant: "ਖੇਤੀ ਸਹਾਇਕ", location: "ਖੇਤ ਦਾ ਮੌਸਮ", language: "ਭਾਸ਼ਾ", auto: "ਆਪਣੇ ਆਪ ਪਛਾਣੋ", you: "ਤੁਸੀਂ", thinking: "ਮਦਦਗਾਰ ਜਾਣਕਾਰੀ ਲੱਭ ਰਹੇ ਹਾਂ…", retry: "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰੋ", askKisan: "ਕਿਸਾਨ AI ਨੂੰ ਪੁੱਛੋ", ready: "ਤਿਆਰ ਹਾਂ", listening: "ਸੁਣ ਰਹੇ ਹਾਂ… ਹੁਣ ਬੋਲੋ", voice: "ਆਵਾਜ਼", stop: "ਰੋਕੋ", send: "ਸੁਨੇਹਾ ਭੇਜੋ", mistakes: "ਕਿਸਾਨ AI ਤੋਂ ਗਲਤੀ ਹੋ ਸਕਦੀ ਹੈ। ਮਹੱਤਵਪੂਰਨ ਸਲਾਹ ਸਥਾਨਕ ਖੇਤੀ ਮਾਹਿਰ ਨਾਲ ਪੱਕੀ ਕਰੋ।" },
-  hi: { home: "किसान AI मुख्य पृष्ठ", tagline: "आपका खेत, हमारी देखभाल", newChat: "नई बातचीत", askAbout: "इसके बारे में पूछें", topics: ["फसल की देखभाल", "मौसम और खेत का काम", "मिट्टी के सवाल", "फसल बेचना"], languageNote: "हिंदी, पंजाबी या अंग्रेज़ी में पूछें", assistant: "खेती सहायक", location: "खेत का मौसम", language: "भाषा", auto: "अपने आप पहचानें", you: "आप", thinking: "उपयोगी जानकारी खोज रहे हैं…", retry: "फिर कोशिश करें", askKisan: "किसान AI से पूछें", ready: "पूछने के लिए तैयार", listening: "सुन रहे हैं… अब बोलें", voice: "आवाज़", stop: "रोकें", send: "संदेश भेजें", mistakes: "किसान AI से गलती हो सकती है। ज़रूरी सलाह स्थानीय कृषि विशेषज्ञ से जाँचें।" },
-  en: { home: "Kisan AI home", tagline: "Your farm, in good hands", newChat: "New chat", askAbout: "ASK ABOUT", topics: ["Crop care", "Weather & field work", "Soil questions", "Selling a crop"], languageNote: "Ask in English, Punjabi, or Hindi.", assistant: "Farm assistant", location: "Farm weather", language: "Language", auto: "Auto-detect", you: "You", thinking: "Finding helpful guidance…", retry: "Try again", askKisan: "Ask Kisan AI", ready: "Ready when you are", listening: "Listening… speak now", voice: "Voice", stop: "Stop", send: "Send message", mistakes: "Kisan AI can make mistakes. Confirm important advice with your local agricultural expert." },
+  pa: { home: "ਕਿਸਾਨ AI ਮੁੱਖ ਪੰਨਾ", tagline: "ਤੁਹਾਡਾ ਖੇਤ, ਸਾਡੀ ਦੇਖਭਾਲ", newChat: "ਨਵੀਂ ਗੱਲਬਾਤ", askAbout: "ਇਸ ਬਾਰੇ ਪੁੱਛੋ", updates: "ਖੇਤੀ ਅਪਡੇਟ", news: "ਖ਼ਬਰਾਂ", topics: ["ਫ਼ਸਲ ਦੀ ਦੇਖਭਾਲ", "ਮੌਸਮ ਅਤੇ ਖੇਤ ਦਾ ਕੰਮ", "ਮਿੱਟੀ ਬਾਰੇ ਸਵਾਲ", "ਫ਼ਸਲ ਵੇਚਣਾ"], languageNote: "ਪੰਜਾਬੀ, ਹਿੰਦੀ ਜਾਂ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਪੁੱਛੋ", assistant: "ਖੇਤੀ ਸਹਾਇਕ", location: "ਖੇਤ ਦਾ ਮੌਸਮ", language: "ਭਾਸ਼ਾ", auto: "ਆਪਣੇ ਆਪ ਪਛਾਣੋ", you: "ਤੁਸੀਂ", thinking: "ਮਦਦਗਾਰ ਜਾਣਕਾਰੀ ਲੱਭ ਰਹੇ ਹਾਂ…", retry: "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰੋ", askKisan: "ਕਿਸਾਨ AI ਨੂੰ ਪੁੱਛੋ", ready: "ਤਿਆਰ ਹਾਂ", listening: "ਸੁਣ ਰਹੇ ਹਾਂ… ਹੁਣ ਬੋਲੋ", voice: "ਆਵਾਜ਼", stop: "ਰੋਕੋ", send: "ਸੁਨੇਹਾ ਭੇਜੋ", mistakes: "ਕਿਸਾਨ AI ਤੋਂ ਗਲਤੀ ਹੋ ਸਕਦੀ ਹੈ। ਮਹੱਤਵਪੂਰਨ ਸਲਾਹ ਸਥਾਨਕ ਖੇਤੀ ਮਾਹਿਰ ਨਾਲ ਪੱਕੀ ਕਰੋ।" },
+  hi: { home: "किसान AI मुख्य पृष्ठ", tagline: "आपका खेत, हमारी देखभाल", newChat: "नई बातचीत", askAbout: "इसके बारे में पूछें", updates: "कृषि अपडेट", news: "खेती की खबरें", topics: ["फसल की देखभाल", "मौसम और खेत का काम", "मिट्टी के सवाल", "फसल बेचना"], languageNote: "हिंदी, पंजाबी या अंग्रेज़ी में पूछें", assistant: "खेती सहायक", location: "खेत का मौसम", language: "भाषा", auto: "अपने आप पहचानें", you: "आप", thinking: "उपयोगी जानकारी खोज रहे हैं…", retry: "फिर कोशिश करें", askKisan: "किसान AI से पूछें", ready: "पूछने के लिए तैयार", listening: "सुन रहे हैं… अब बोलें", voice: "आवाज़", stop: "रोकें", send: "संदेश भेजें", mistakes: "किसान AI से गलती हो सकती है। ज़रूरी सलाह स्थानीय कृषि विशेषज्ञ से जाँचें।" },
+  en: { home: "Kisan AI home", tagline: "Your farm, in good hands", newChat: "New chat", askAbout: "ASK ABOUT", updates: "FARM UPDATES", news: "Agricultural news", topics: ["Crop care", "Weather & field work", "Soil questions", "Selling a crop"], languageNote: "Ask in English, Punjabi, or Hindi.", assistant: "Farm assistant", location: "Farm weather", language: "Language", auto: "Auto-detect", you: "You", thinking: "Finding helpful guidance…", retry: "Try again", askKisan: "Ask Kisan AI", ready: "Ready when you are", listening: "Listening… speak now", voice: "Voice", stop: "Stop", send: "Send message", mistakes: "Kisan AI can make mistakes. Confirm important advice with your local agricultural expert." },
 } as const;
 
 export default function ChatUI({
@@ -92,10 +93,56 @@ export default function ChatUI({
   const messagesContainerRef = useRef<HTMLElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const wasSidebarOpenRef = useRef(false);
   const [activeNavigation, setActiveNavigation] = useState("New chat");
-  const [weatherLocation, setWeatherLocation] = useState("");
-  const uiLanguage = speechLanguageChoice === "auto" ? language ?? "pa" : speechLanguageChoice;
+  const selectedUiLanguage = speechLanguageChoice === "auto" ? language : speechLanguageChoice;
+  const uiLanguage: "pa" | "hi" | "en" = selectedUiLanguage === "hi" || selectedUiLanguage === "en"
+    ? selectedUiLanguage
+    : "pa";
   const copy = interfaceCopy[uiLanguage === "hi" ? "hi" : uiLanguage === "en" ? "en" : "pa"];
+  const languageChoices = uiLanguage === "pa"
+    ? "ਪੰਜਾਬੀ · हिंदी · English"
+    : uiLanguage === "hi"
+      ? "पंजाबी · हिंदी · English"
+      : "Punjabi · Hindi · English";
+
+  useEffect(() => {
+    if (!sidebarOpen) {
+      if (wasSidebarOpenRef.current) menuButtonRef.current?.focus();
+      wasSidebarOpenRef.current = false;
+      return;
+    }
+    wasSidebarOpenRef.current = true;
+    closeMenuButtonRef.current?.focus();
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSidebarOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = sidebarRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), select:not([disabled])',
+      );
+      if (!focusable?.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [sidebarOpen]);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -133,14 +180,15 @@ export default function ChatUI({
   };
 
   return (
-    <div className={`chat-app${sidebarOpen ? " sidebar-open" : ""}`} lang={uiLanguage}>
+    <div className={`chat-app${sidebarOpen ? " sidebar-open" : ""}${listening ? " is-listening" : ""}${send ? " is-processing" : ""}${speaking ? " is-speaking" : ""}${speechError ? " has-speech-error" : ""}`} lang={uiLanguage}>
       <button className="sidebar-scrim" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} tabIndex={sidebarOpen ? 0 : -1} />
 
-      <aside className="sidebar" aria-label="Main navigation">
+      <aside ref={sidebarRef} id="main-navigation" className="sidebar" aria-label="Main navigation" aria-hidden={!sidebarOpen} aria-modal={sidebarOpen || undefined} role={sidebarOpen ? "dialog" : undefined}>
         <a className="brand" href="/" aria-label={copy.home}>
           <span className="brand-mark" aria-hidden="true"><Sprout size={21} strokeWidth={2.2} /></span>
           <span className="brand-copy"><strong>Kisan AI</strong><small>{copy.tagline}</small></span>
         </a>
+        <button ref={closeMenuButtonRef} className="sidebar-close-button" type="button" onClick={() => setSidebarOpen(false)} aria-label={uiLanguage === "hi" ? "बंद करें" : uiLanguage === "en" ? "Close menu" : "ਬੰਦ ਕਰੋ"}><X size={20} /></button>
 
         <a className="new-chat-button" href="/"><Plus size={17} strokeWidth={2.2} /><span>{copy.newChat}</span><span className="new-chat-shortcut">⌘ K</span></a>
 
@@ -155,21 +203,29 @@ export default function ChatUI({
           </nav>
         </div>
 
-        <div className="sidebar-bottom">
-          <div className="sidebar-language-note"><BookOpenText size={17} aria-hidden="true" /><p>{copy.languageNote}</p></div>
+        <div className="sidebar-section">
+          <p className="sidebar-label">{copy.updates}</p>
+          <nav className="primary-navigation" aria-label={copy.updates}>
+            <a className="navigation-link" href="/news" onClick={() => setSidebarOpen(false)}>
+              <Newspaper size={17} strokeWidth={1.8} /><span>{copy.news}</span>
+            </a>
+          </nav>
+        </div>
+
+        <div className="sidebar-section sidebar-language-section">
+          <label className="language-select" htmlFor="speech-language"><span>{copy.language}</span>
+            <select id="speech-language" value={speechLanguageChoice} onChange={onSpeechLanguageChange} disabled={voiceMode || send}>
+              <option value="auto">{copy.auto}</option><option value="pa">{uiLanguage === "pa" ? "ਪੰਜਾਬੀ" : uiLanguage === "hi" ? "पंजाबी" : "Punjabi"}</option><option value="hi">{uiLanguage === "pa" ? "ਹਿੰਦੀ" : uiLanguage === "hi" ? "हिंदी" : "Hindi"}</option><option value="en">English</option>
+            </select>
+          </label>
         </div>
       </aside>
 
       <section className="chat-workspace">
         <header className="chat-header">
-          <div className="header-leading"><button className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label={uiLanguage === "hi" ? "नेविगेशन खोलें" : uiLanguage === "en" ? "Open navigation menu" : "ਮੁੱਖ ਸੂਚੀ ਖੋਲ੍ਹੋ"}><Menu size={20} /></button><span className="header-page-title">{copy.assistant}</span></div>
+          <div className="header-leading"><button ref={menuButtonRef} className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label={uiLanguage === "hi" ? "नेविगेशन खोलें" : uiLanguage === "en" ? "Open navigation menu" : "ਮੁੱਖ ਸੂਚੀ ਖੋਲ੍ਹੋ"} aria-expanded={sidebarOpen} aria-controls="main-navigation"><Menu size={20} /></button><span className="header-page-title">{copy.assistant}</span></div>
           <div className="header-tools">
-            <span className="location-pill"><MapPin size={14} /><span>{weatherLocation || copy.location}</span></span><span className="header-divider" />
-            <label className="language-select" htmlFor="speech-language"><span>{copy.language}</span>
-              <select id="speech-language" value={speechLanguageChoice} onChange={onSpeechLanguageChange} disabled={voiceMode || send}>
-                <option value="auto">{copy.auto}</option><option value="pa">ਪੰਜਾਬੀ</option><option value="hi">हिन्दी</option><option value="en">English</option>
-              </select>
-            </label>
+            <BatteryDisplay />
           </div>
         </header>
 
@@ -179,10 +235,8 @@ export default function ChatUI({
         }}>
           {!response && !send && !chatError && (
             <section className="welcome weather-home-welcome" aria-label="Local farm weather">
-              <WeatherWidget language={uiLanguage} onWeatherLoaded={(weather) => {
-                setWeatherLocation([weather.location, weather.country].filter(Boolean).join(", "));
-                onWeatherLoaded(weather);
-              }} onAskAssistant={(question) => onSubmit(question)} />
+              <HomeStatusPanel language={uiLanguage} />
+              <WeatherWidget language={uiLanguage} onWeatherLoaded={onWeatherLoaded} onAskAssistant={(question) => onSubmit(question)} />
             </section>
           )}
 
@@ -206,10 +260,10 @@ export default function ChatUI({
 
         <footer className="chat-input-area">
           <div className="composer-wrap">
-            <div className="composer-label"><span className="composer-mark"><Sprout size={14} /></span><span>{copy.askKisan}</span><span className="composer-language">{language ? getLanguageName(language) : copy.ready}</span></div>
+            <div className="composer-label"><span className="composer-mark"><Sprout size={14} /></span><span>{copy.askKisan}</span><span className="composer-language">{language ? getLanguageName(language) : languageChoices}</span></div>
             <div className="chat-input-wrapper">
+              <button className={`voice-button${listening ? " listening" : ""}`} type="button" onClick={onVoiceInput} disabled={directBusy || (send && !voiceMode)} aria-label={voiceMode ? copy.stop : listening ? copy.listening : copy.voice} aria-pressed={voiceMode} title={voiceMode ? copy.stop : copy.voice}>{voiceMode ? <X size={22} /> : <AudioLines size={22} />}<span>{voiceMode ? copy.stop : listening ? (uiLanguage === "pa" ? "ਸੁਣੋ" : uiLanguage === "hi" ? "सुनें" : "Listening") : copy.voice}</span></button>
               <input type="text" placeholder={listening ? copy.listening : uiLanguage === "hi" ? "फसल, मिट्टी या कीट के बारे में पूछें…" : uiLanguage === "en" ? "Ask about crops, soil, or pests…" : "ਫ਼ਸਲ, ਮਿੱਟੀ ਜਾਂ ਕੀੜਿਆਂ ਬਾਰੇ ਪੁੱਛੋ…"} value={prompt} onChange={onPromptChange} onKeyDown={onKeyDown} disabled={send || directBusy || listening || voiceMode} aria-label={copy.askKisan} />
-              <button className={`voice-button${listening ? " listening" : ""}`} type="button" onClick={onVoiceInput} disabled={directBusy || (send && !voiceMode)} aria-label={voiceMode ? copy.stop : copy.voice} title={voiceMode ? copy.stop : copy.voice}>{voiceMode ? <X size={17} /> : <AudioLines size={17} />}<span>{voiceMode ? copy.stop : listening ? (uiLanguage === "pa" ? "ਸੁਣੋ" : uiLanguage === "hi" ? "सुनें" : "Listening") : copy.voice}</span></button>
               <button className="send-button" type="button" onClick={() => onSubmit()} disabled={send || directBusy || voiceMode || !prompt.trim()} aria-label={copy.send} title={copy.send}>{send ? <span className="send-spinner" /> : <Send size={18} strokeWidth={2} />}</button>
             </div>
           </div>
