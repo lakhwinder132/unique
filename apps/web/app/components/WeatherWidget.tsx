@@ -50,6 +50,17 @@ type SelectedPlace = {
   longitude: number;
 };
 
+const SAVED_WEATHER_PLACE_KEY = "sarc-weather-place-v1";
+
+function isSelectedPlace(value: unknown): value is SelectedPlace {
+  if (!value || typeof value !== "object") return false;
+  const place = value as Partial<SelectedPlace>;
+  return typeof place.name === "string"
+    && typeof place.country === "string"
+    && typeof place.latitude === "number" && Number.isFinite(place.latitude) && place.latitude >= -90 && place.latitude <= 90
+    && typeof place.longitude === "number" && Number.isFinite(place.longitude) && place.longitude >= -180 && place.longitude <= 180;
+}
+
 type ConditionKind = "clear" | "cloudy" | "fog" | "rain" | "storm" | "snow" | "unknown";
 type Condition = { label: string; kind: ConditionKind; icon: LucideIcon };
 
@@ -576,8 +587,15 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
         throw new Error(message);
       }
       if (!isWeatherData(data)) throw new Error("Weather data was incomplete. Please try again.");
+      const resolvedPlace = { ...place, name: data.location || place.name, country: data.country || place.country };
       setWeather(data);
-      setSelectedPlace(place);
+      setSelectedPlace(resolvedPlace);
+      setLocationQuery([data.location, data.country].filter(Boolean).join(", "));
+      try {
+        window.localStorage.setItem(SAVED_WEATHER_PLACE_KEY, JSON.stringify(resolvedPlace));
+      } catch {
+        // Weather remains usable when browser storage is unavailable.
+      }
       onWeatherLoaded(data);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.name === "AbortError") return;
@@ -593,6 +611,18 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
   useEffect(() => {
     refreshCallback.current = (place) => { void loadWeather(place); };
   });
+
+  useEffect(() => {
+    try {
+      const savedPlace = window.localStorage.getItem(SAVED_WEATHER_PLACE_KEY);
+      if (!savedPlace) return;
+      const place: unknown = JSON.parse(savedPlace);
+      if (isSelectedPlace(place)) refreshCallback.current(place);
+      else window.localStorage.removeItem(SAVED_WEATHER_PLACE_KEY);
+    } catch {
+      // Ignore unavailable or malformed saved preferences and let the user choose a place.
+    }
+  }, []);
 
   useEffect(() => {
     const timeline = forecastTimelineRef.current;
@@ -879,7 +909,6 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
             aria-label={language === "pa" ? "ਮੌਸਮ ਦੀ ਹੋਰ ਜਾਣਕਾਰੀ ਵੇਖੋ" : language === "hi" ? "मौसम की और जानकारी देखें" : "Open detailed weather forecast"}
             title={language === "pa" ? "ਮੌਸਮ ਦੀ ਹੋਰ ਜਾਣਕਾਰੀ" : language === "hi" ? "मौसम की और जानकारी" : "More weather information"}
           >
-            <span className="weather-scene-open-cue" aria-hidden="true"><CloudSun size={18} /><span>{copy.forecast}</span><span>↗</span></span>
           </button>
         )}
       </div>
@@ -933,7 +962,11 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
                       <time dateTime={hour.time}>{formatTime(hour.time, weather.timezone, language)}</time>
                       <HourIcon size={21} strokeWidth={1.7} aria-hidden="true" />
                       <strong>{formatTemperature(hour.temperature, weather.hourlyUnits.temperature_2m)}</strong>
-                      {hour.rainChance !== null && <span className="weather-hour-rain"><Droplets size={11} aria-hidden="true" />{Math.round(hour.rainChance)}%</span>}
+                      {hour.rainChance !== null && <span className="weather-hour-rain" aria-label={`${Math.round(hour.rainChance)}% chance of rain`} title={`${Math.round(hour.rainChance)}% chance of rain`}>
+                        <Droplets size={13} aria-hidden="true" />
+                        <span className="weather-rain-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, hour.rainChance))}%` }} /></span>
+                        <strong>{Math.round(hour.rainChance)}%</strong>
+                      </span>}
                     </li>
                   );
                 })}
@@ -978,35 +1011,35 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
                   </div>
                 )}
                 {windSpeed !== null && (
-                  <div className="weather-reading-row">
+                  <div className="weather-reading-row weather-reading-row--wind">
                     <span className="weather-reading-icon"><Wind size={17} aria-hidden="true" /></span>
                     <span className="weather-reading-label">Wind</span>
                     <span className="weather-reading-value">{formatMeasure(windSpeed, weather.currentUnits.wind_speed_10m)}{windGust === null ? "" : ` · gusts ${formatMeasure(windGust, weather.currentUnits.wind_gusts_10m)}`}</span>
                   </div>
                 )}
                 {windDirection !== null && (
-                  <div className="weather-reading-row">
+                  <div className="weather-reading-row weather-reading-row--direction">
                     <span className="weather-reading-icon"><Compass size={17} aria-hidden="true" /></span>
                     <span className="weather-reading-label">Wind direction</span>
                     <span className="weather-reading-value">{Math.round(windDirection)}°</span>
                   </div>
                 )}
                 {cloudCover !== null && (
-                  <div className="weather-reading-row">
+                  <div className="weather-reading-row weather-reading-row--cloud-cover">
                     <span className="weather-reading-icon"><Cloud size={17} aria-hidden="true" /></span>
                     <span className="weather-reading-label">Cloud cover</span>
                     <span className="weather-reading-value">{Math.round(cloudCover)}%</span>
                   </div>
                 )}
                 {currentRain !== null && (
-                  <div className="weather-reading-row">
+                  <div className="weather-reading-row weather-reading-row--current-rain">
                     <span className="weather-reading-icon"><Droplets size={17} aria-hidden="true" /></span>
                     <span className="weather-reading-label">Current precipitation</span>
                     <span className="weather-reading-value">{formatMeasure(currentRain, weather.currentUnits.precipitation, 1)}</span>
                   </div>
                 )}
                 {dailyRain !== null && (
-                  <div className="weather-reading-row">
+                  <div className="weather-reading-row weather-reading-row--daily-rain">
                     <span className="weather-reading-icon"><CloudRain size={17} aria-hidden="true" /></span>
                     <span className="weather-reading-label">Today's precipitation</span>
                     <span className="weather-reading-value">{formatMeasure(dailyRain, dailyRainUnit, 1)}</span>
@@ -1028,7 +1061,11 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
               <p className="weather-section-kicker">FIELD WEATHER NOTE</p>
               <h3 id="farm-weather-note-title">Forecast context for your day</h3>
               {peakRain ? (
-                <p>Hourly rain probability ranges from {Math.round(Math.min(...hourlyRain.map(({ value }) => value)))}% to {Math.round(Math.max(...hourlyRain.map(({ value }) => value)))}% today, with the highest chance around {formatTime(peakRain.time, weather.timezone, language)}.</p>
+                <div className="farm-rain-chance" aria-label={`Highest chance of rain today is ${Math.round(peakRain.value)} percent, around ${formatTime(peakRain.time, weather.timezone, language)}`}>
+                  <div className="farm-rain-chance-label"><CloudRain size={20} aria-hidden="true" /><span>Chance of rain today</span><strong>{Math.round(peakRain.value)}%</strong></div>
+                  <div className="farm-rain-chance-track" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, peakRain.value))}%` }} /></div>
+                  <p>Most likely around {formatTime(peakRain.time, weather.timezone, language)}. The bar shows the chance of rain.</p>
+                </div>
               ) : minimumDayTemperature !== null && maximumDayTemperature !== null ? (
                 <p>The available hourly temperature forecast ranges from {formatTemperature(minimumDayTemperature, weather.hourlyUnits.temperature_2m)} to {formatTemperature(maximumDayTemperature, weather.hourlyUnits.temperature_2m)} today.</p>
               ) : (
