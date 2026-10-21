@@ -114,6 +114,26 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
 
+## Optional shared activity records
+
+Users can opt in using the checkbox below the message box. Only opted-in chat
+requests and the approximate coordinates of the currently selected weather
+region are recorded. Coordinates are rounded to two decimal places; no account
+name or IP address is added by this feature. A temporary anonymous browser
+session code groups requests made in the same tab session. The checkbox is off
+by default and can be turned off at any time. Records are visible to the app
+owner, kept for up to 30 days, and stored in
+`/var/lib/ollama-farmer/activity` on the VM. The log is capped at 20 MB.
+
+Set `ACTIVITY_ADMIN_TOKEN` in `/etc/ollama-farmer.env` to a private random
+secret of at least 32 characters (for example, generate one with
+`openssl rand -hex 32`). Set `ACTIVITY_LOG_DIR` to
+`/var/lib/ollama-farmer/activity`. The deployment workflow mounts that VM
+directory into the app container so records survive container replacement.
+Open `/admin/activity` and enter the token to review the latest 200 shared
+requests. Keep the token private; the admin route does not use app accounts.
+Activity records can only be viewed after the token is configured.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

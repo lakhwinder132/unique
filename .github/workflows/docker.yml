@@ -38,6 +38,7 @@ jobs:
             sudo docker rm farmer-ai || true
             sudo docker stop ollama-farmer || true
             sudo docker rm ollama-farmer || true
+            sudo mkdir -p /var/lib/ollama-farmer/activity
 
-            sudo docker run -d --name ollama-farmer --restart unless-stopped --env-file /etc/ollama-farmer.env -p 3001:3001 -p 3000:3000 -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" -e BHASHINI_INFERENCE_KEY="${{secrets.BHASHINI_INFERENCE_KEY}}" ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
+            sudo docker run -d --name ollama-farmer --restart unless-stopped --env-file /etc/ollama-farmer.env -v /var/lib/ollama-farmer/activity:/var/lib/ollama-farmer/activity -p 3001:3001 -p 3000:3000 -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" -e BHASHINI_INFERENCE_KEY="${{secrets.BHASHINI_INFERENCE_KEY}}" ${{ secrets.DOCKERHUB_USERNAME }}/ollama-farmer:${{github.sha}}
             sudo docker image prune -f

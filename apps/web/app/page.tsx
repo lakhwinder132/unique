@@ -22,6 +22,20 @@ const weatherQuestionPattern = /\b(weather|forecast|rain|rainfall|temperature|wi
 const directTestingEnabled = process.env.NODE_ENV !== "production";
 const directOllamaBaseUrl = process.env.NEXT_PUBLIC_OLLAMA_TEST_URL?.trim() ?? "";
 
+function getActivityVisitorId() {
+  try {
+    const saved = window.sessionStorage.getItem("kisan-ai-activity-visitor");
+    if (saved) return saved;
+    const id = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.sessionStorage.setItem("kisan-ai-activity-visitor", id);
+    return id;
+  } catch {
+    return `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
 function buildWeatherContext(weather: WeatherData, question: string) {
   const asksForRain = /rain|precip|shower|irrigat|water|meeh|ਮੀਂਹ|ਬਾਰਿਸ਼|बारिश|वर्षा|सਿੰਚਾਈ/i.test(question);
   const asksForWind = /wind|spray|ਹਵਾ|ਛਿੜਕ|हवा/i.test(question);
@@ -165,6 +179,7 @@ export default function App() {
   const [response, setResponse] = useState("");
   const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [activitySharing, setActivitySharing] = useState(false);
   const [send, setSend] = useState(false);
   const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
   const [directModels, setDirectModels] = useState<string[]>([]);
@@ -209,6 +224,14 @@ export default function App() {
     }
     if (savedLanguage === "auto" || savedLanguage === "pa" || savedLanguage === "hi" || savedLanguage === "en") {
       setSpeechLanguageChoice(savedLanguage);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      setActivitySharing(window.localStorage.getItem("kisan-ai-share-activity") === "yes");
+    } catch {
+      setActivitySharing(false);
     }
   }, []);
 
@@ -265,6 +288,25 @@ export default function App() {
     const question = (voiceQuestion ?? prompt).trim();
     if (!question || send || directBusy) {
       return;
+    }
+
+    if (activitySharing) {
+      void fetch("/api/activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consent: true,
+          visitorId: getActivityVisitorId(),
+          request: question,
+          region: weatherData ? {
+            name: weatherData.location,
+            country: weatherData.country,
+            latitude: weatherData.latitude,
+            longitude: weatherData.longitude,
+          } : null,
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
     }
 
     audioRef.current?.pause();
@@ -561,9 +603,18 @@ export default function App() {
       directResponseTime={directResponseTime}
       directBusy={directBusy}
       directBaseUrl={directOllamaBaseUrl}
+      activitySharing={activitySharing}
       onChatModeChange={(event) => setChatMode(event.target.value === "direct" ? "direct" : "backend")}
       onDirectModelChange={(event) => setDirectModel(event.target.value)}
       onTestDirectOllama={() => void handleTestDirectOllama()}
+      onActivitySharingChange={(enabled) => {
+        setActivitySharing(enabled);
+        try {
+          window.localStorage.setItem("kisan-ai-share-activity", enabled ? "yes" : "no");
+        } catch {
+          // Keep the in-memory preference for this visit when storage is unavailable.
+        }
+      }}
     />
     
   );
