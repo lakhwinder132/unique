@@ -11,7 +11,10 @@ export type ActivityEntry = {
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_LOG_BYTES = 20 * 1024 * 1024;
-const LOG_FILE = join(process.env.ACTIVITY_LOG_DIR || "/var/lib/ollama-farmer/activity", "activity.jsonl");
+const DEFAULT_LOG_DIR = process.env.NODE_ENV === "production"
+  ? "/var/lib/ollama-farmer/activity"
+  : join(process.cwd(), "data", "activity");
+const LOG_FILE = join(process.env.ACTIVITY_LOG_DIR || DEFAULT_LOG_DIR, "activity.jsonl");
 let writeQueue: Promise<void> = Promise.resolve();
 let lastPrunedAt = 0;
 

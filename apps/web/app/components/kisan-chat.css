@@ -193,6 +193,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible { 
 .input-meta { display: grid; min-height: 20px; justify-items: center; gap: 7px; padding-top: 7px; }
 .activity-sharing-choice { display: flex; max-width: 720px; align-items: flex-start; gap: 8px; color: #68776d; font-size: 11px; line-height: 1.45; cursor: pointer; }
 .activity-sharing-choice input { width: 17px; height: 17px; flex: 0 0 17px; margin: 0; accent-color: #315c46; }
+.activity-local-notice { margin: 0; color: #68776d; font-size: 11px; line-height: 1.45; text-align: center; }
 .input-hint { margin: 0; color: #9aa298; font-size: 10px; line-height: 1.4; text-align: center; }
 .voice-mode-status,.speech-error { margin: 0; color: #4d7957; font-size: 9px; text-align: center; }
 .speech-error { color: #a34b3f; }

@@ -42,7 +42,6 @@ type ChatUIProps = {
   directResponseTime: number | null;
   directBusy: boolean;
   directBaseUrl: string;
-  activitySharing: boolean;
   onWeatherLoaded: (weather: WeatherData) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (prompt?: string) => void;
@@ -54,7 +53,6 @@ type ChatUIProps = {
   onChatModeChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   onDirectModelChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   onTestDirectOllama: () => void;
-  onActivitySharingChange: (enabled: boolean) => void;
 };
 
 const navigation = [
@@ -70,10 +68,16 @@ const interfaceCopy = {
   en: { home: "Kisan AI home", tagline: "Your farm, in good hands", newChat: "New chat", askAbout: "ASK ABOUT", updates: "FARM UPDATES", news: "Agricultural news", topics: ["Crop care", "Weather & field work", "Soil questions", "Selling a crop"], languageNote: "Ask in English, Punjabi, or Hindi.", assistant: "Farm assistant", location: "Farm weather", language: "Language", auto: "Auto-detect", you: "You", thinking: "Finding helpful guidance…", retry: "Try again", askKisan: "Ask Kisan AI", ready: "Ready when you are", listening: "Listening… speak now", voice: "Voice", stop: "Stop", send: "Send message", mistakes: "Kisan AI can make mistakes. Confirm important advice with your local agricultural expert." },
 } as const;
 
-const activitySharingCopy = {
-  pa: "ਮੇਰੇ ਸਵਾਲ ਅਤੇ ਲਗਭਗ ਇਲਾਕਾ ਮਾਲਕ ਨਾਲ ਸਾਂਝੇ ਕਰੋ (30 ਦਿਨ; ਗੁਪਤ ਸੈਸ਼ਨ ਕੋਡ ਨਾਲ)। ਵਿਕਲਪਿਕ ਹੈ।",
-  hi: "मेरे सवाल और लगभग इलाका मालिक के साथ साझा करें (30 दिन; गुप्त सत्र कोड के साथ)। वैकल्पिक है।",
-  en: "Share my questions and approximate area with the app owner (up to 30 days; anonymous session code). Optional; turn off to stop future sharing.",
+const localActivityLoggingCopy = {
+  pa: "ਸਥਾਨਕ ਟੈਸਟ: ਤੁਹਾਡੇ ਸਵਾਲ ਇਸ ਕੰਪਿਊਟਰ ਉੱਤੇ ਆਪਣੇ ਆਪ ਸੰਭਾਲੇ ਜਾਂਦੇ ਹਨ।",
+  hi: "स्थानीय परीक्षण: आपके सवाल इसी कंप्यूटर पर अपने आप सहेजे जाते हैं।",
+  en: "Local testing: your questions are saved automatically on this computer.",
+} as const;
+
+const automaticActivityLoggingCopy = {
+  pa: "ਤੁਹਾਡੇ ਸਵਾਲ ਅਤੇ ਮੌਸਮ ਲਈ ਵਰਤੀ ਥਾਂ ਐਪ ਦੇ ਮਾਲਕ ਨੂੰ ਆਪਣੇ ਆਪ ਭੇਜੇ ਜਾਂਦੇ ਹਨ (30 ਦਿਨ ਤੱਕ)।",
+  hi: "आपके सवाल और मौसम के लिए इस्तेमाल की गई जगह ऐप के मालिक को अपने आप भेजी जाती है (30 दिन तक)।",
+  en: "Your questions and weather location, including coordinates, are sent to the app owner and kept for up to 30 days.",
 } as const;
 
 export default function ChatUI({
@@ -89,7 +93,6 @@ export default function ChatUI({
   speechError,
   speechLanguageChoice,
   directBusy,
-  activitySharing,
   onPromptChange,
   onSubmit,
   onSuggestionSelect,
@@ -98,7 +101,6 @@ export default function ChatUI({
   onWeatherLoaded,
   onSpeechLanguageChange,
   onKeyDown,
-  onActivitySharingChange,
 }: ChatUIProps) {
   const messagesContainerRef = useRef<HTMLElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -277,7 +279,9 @@ export default function ChatUI({
             </div>
           </div>
           <div className="input-meta">
-            <label className="activity-sharing-choice"><input type="checkbox" checked={activitySharing} onChange={(event) => onActivitySharingChange(event.target.checked)} /><span>{activitySharingCopy[uiLanguage]}</span></label>
+            {process.env.NODE_ENV === "production"
+              ? <p className="activity-local-notice">{automaticActivityLoggingCopy[uiLanguage]}</p>
+              : <p className="activity-local-notice">{localActivityLoggingCopy[uiLanguage]}</p>}
             {voiceMode && <p className="voice-mode-status" aria-live="polite">{listening ? copy.listening : send ? copy.thinking : speaking ? (uiLanguage === "pa" ? "ਬੋਲ ਰਹੇ ਹਾਂ…" : uiLanguage === "hi" ? "बोल रहे हैं…" : "Speaking…") : uiLanguage === "pa" ? "ਆਵਾਜ਼ੀ ਗੱਲਬਾਤ ਚਾਲੂ ਹੈ" : uiLanguage === "hi" ? "आवाज़ बातचीत चालू है" : "Voice conversation active"}</p>}
             {speechError && <p className="speech-error" role="status">{speechError}</p>}
             <p className="input-hint">{copy.mistakes}</p>

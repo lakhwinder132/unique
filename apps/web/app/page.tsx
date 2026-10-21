@@ -179,7 +179,6 @@ export default function App() {
   const [response, setResponse] = useState("");
   const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [activitySharing, setActivitySharing] = useState(false);
   const [send, setSend] = useState(false);
   const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
   const [directModels, setDirectModels] = useState<string[]>([]);
@@ -224,14 +223,6 @@ export default function App() {
     }
     if (savedLanguage === "auto" || savedLanguage === "pa" || savedLanguage === "hi" || savedLanguage === "en") {
       setSpeechLanguageChoice(savedLanguage);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      setActivitySharing(window.localStorage.getItem("kisan-ai-share-activity") === "yes");
-    } catch {
-      setActivitySharing(false);
     }
   }, []);
 
@@ -290,8 +281,7 @@ export default function App() {
       return;
     }
 
-    if (activitySharing) {
-      void fetch("/api/activity", {
+    void fetch("/api/activity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -306,8 +296,7 @@ export default function App() {
           } : null,
         }),
         keepalive: true,
-      }).catch(() => undefined);
-    }
+    }).catch(() => undefined);
 
     audioRef.current?.pause();
     speechController.current?.abort();
@@ -603,18 +592,9 @@ export default function App() {
       directResponseTime={directResponseTime}
       directBusy={directBusy}
       directBaseUrl={directOllamaBaseUrl}
-      activitySharing={activitySharing}
       onChatModeChange={(event) => setChatMode(event.target.value === "direct" ? "direct" : "backend")}
       onDirectModelChange={(event) => setDirectModel(event.target.value)}
       onTestDirectOllama={() => void handleTestDirectOllama()}
-      onActivitySharingChange={(enabled) => {
-        setActivitySharing(enabled);
-        try {
-          window.localStorage.setItem("kisan-ai-share-activity", enabled ? "yes" : "no");
-        } catch {
-          // Keep the in-memory preference for this visit when storage is unavailable.
-        }
-      }}
     />
     
   );
