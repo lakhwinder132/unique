@@ -4,7 +4,7 @@ import "./fieldwise.css";
 import "./kisan-chat.css";
 
 import ReactMarkdown from "react-markdown";
-import HomeStatusPanel, { BatteryDisplay } from "./HomeStatusPanel";
+import { BatteryDisplay } from "./HomeStatusPanel";
 import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
   AudioLines,
@@ -225,7 +225,7 @@ export default function ChatUI({
         <header className="chat-header">
           <div className="header-leading"><button ref={menuButtonRef} className="mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label={uiLanguage === "hi" ? "नेविगेशन खोलें" : uiLanguage === "en" ? "Open navigation menu" : "ਮੁੱਖ ਸੂਚੀ ਖੋਲ੍ਹੋ"} aria-expanded={sidebarOpen} aria-controls="main-navigation"><Menu size={20} /></button><span className="header-page-title">{copy.assistant}</span></div>
           <div className="header-tools">
-            <BatteryDisplay />
+            <BatteryDisplay language={uiLanguage} />
           </div>
         </header>
 
@@ -235,7 +235,6 @@ export default function ChatUI({
         }}>
           {!response && !send && !chatError && (
             <section className="welcome weather-home-welcome" aria-label="Local farm weather">
-              <HomeStatusPanel language={uiLanguage} />
               <WeatherWidget language={uiLanguage} onWeatherLoaded={onWeatherLoaded} onAskAssistant={(question) => onSubmit(question)} />
             </section>
           )}

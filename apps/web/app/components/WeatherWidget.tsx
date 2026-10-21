@@ -454,6 +454,7 @@ function DailyWeatherChart({
 
 export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, language = "en" }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [showWeatherDetails, setShowWeatherDetails] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locations, setLocations] = useState<WeatherLocation[]>([]);
@@ -463,6 +464,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
   const [sceneVisible, setSceneVisible] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
   const sceneRef = useRef<HTMLDivElement | null>(null);
+  const weatherDetailsRef = useRef<HTMLDetailsElement | null>(null);
   const forecastTimelineRef = useRef<HTMLOListElement | null>(null);
   const currentHourRef = useRef<HTMLLIElement | null>(null);
   const requestController = useRef<AbortController | null>(null);
@@ -753,6 +755,14 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
   const maximumDayTemperature = dayHours.flatMap(({ temperature }) => temperature === null ? [] : [temperature]).reduce<number | null>((maximum, value) => maximum === null ? value : Math.max(maximum, value), null);
   const sceneMotionActive = sceneVisible && pageVisible && !reducedMotion;
 
+  const openWeatherDetails = () => {
+    const details = weatherDetailsRef.current;
+    if (!weather || !details) return;
+    details.open = true;
+    setShowWeatherDetails(true);
+    requestAnimationFrame(() => details.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -761,7 +771,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
   }, [windSpeed]);
 
   return (
-    <section className="weather-home" aria-label="Local farm weather">
+    <section className={`weather-home${showWeatherDetails ? " showing-weather-details" : ""}`} aria-label="Local farm weather">
       <div className="weather-home-toolbar">
         <form className="weather-home-search" onSubmit={searchLocations} role="search">
           <label className="weather-visually-hidden" htmlFor="weather-location">{copy.searchPlaceholder}</label>
@@ -861,6 +871,17 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
             <small>High <b>·</b> Low</small>
           </div>
         )}
+        {weather && (
+          <button
+            className="weather-scene-open"
+            type="button"
+            onClick={openWeatherDetails}
+            aria-label={language === "pa" ? "ਮੌਸਮ ਦੀ ਹੋਰ ਜਾਣਕਾਰੀ ਵੇਖੋ" : language === "hi" ? "मौसम की और जानकारी देखें" : "Open detailed weather forecast"}
+            title={language === "pa" ? "ਮੌਸਮ ਦੀ ਹੋਰ ਜਾਣਕਾਰੀ" : language === "hi" ? "मौसम की और जानकारी" : "More weather information"}
+          >
+            <span className="weather-scene-open-cue" aria-hidden="true"><CloudSun size={18} /><span>{copy.forecast}</span><span>↗</span></span>
+          </button>
+        )}
       </div>
 
       <nav className="farm-feature-grid" aria-label={language === "pa" ? "ਖੇਤੀ ਦੇ ਵਿਸ਼ੇ" : language === "hi" ? "खेती के विषय" : "Farm topics"}>
@@ -884,8 +905,14 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
 
       {weather && (
         <div className="weather-full-report">
-          <details className="weather-more-details">
-            <summary>{language === "pa" ? "ਘੰਟੇਵਾਰ ਮੌਸਮ ਅਤੇ ਹੋਰ ਜਾਣਕਾਰੀ" : language === "hi" ? "घंटेवार मौसम और दूसरी जानकारी" : "See hourly forecast and details"}</summary>
+          <details
+            ref={weatherDetailsRef}
+            className="weather-more-details"
+            onToggle={(event) => setShowWeatherDetails(event.currentTarget.open)}
+          >
+            <summary>{showWeatherDetails
+              ? language === "pa" ? "ਵਾਪਸ ਮੌਸਮ ਵਾਲੇ ਮੁੱਖ ਪੰਨੇ ਤੇ" : language === "hi" ? "मौसम के मुख्य पन्ने पर वापस जाएँ" : "Back to farm home"
+              : language === "pa" ? "ਘੰਟੇਵਾਰ ਮੌਸਮ ਅਤੇ ਹੋਰ ਜਾਣਕਾਰੀ" : language === "hi" ? "घंटेवार मौसम और दूसरी जानकारी" : "See hourly forecast and details"}</summary>
             <section className="weather-day-section" aria-labelledby="weather-day-title">
             <div className="weather-section-heading weather-day-heading">
               <div>
