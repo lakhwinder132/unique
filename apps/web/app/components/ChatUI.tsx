@@ -42,7 +42,8 @@ type ChatUIProps = {
   directResponseTime: number | null;
   directBusy: boolean;
   directBaseUrl: string;
-  onWeatherLoaded: (weather: WeatherData, usingDeviceLocation: boolean) => void;
+  onWeatherLoaded: (weather: WeatherData) => void;
+  onLocationSelected: (place: { name: string; country: string; latitude: number; longitude: number; source: "device" | "search" }) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (prompt?: string) => void;
   onSuggestionSelect: (text: string) => void;
@@ -75,9 +76,9 @@ const localActivityLoggingCopy = {
 } as const;
 
 const automaticActivityLoggingCopy = {
-  pa: "ਤੁਹਾਡੇ ਸਵਾਲ ਆਪਣੇ ਆਪ ਭੇਜੇ ਜਾਂਦੇ ਹਨ। ‘ਮੇਰੀ ਥਾਂ’ ਵਰਤਣ ਤੇ ਥਾਂ ਦੇ ਕੋਆਰਡੀਨੇਟ ਵੀ ਭੇਜੇ ਜਾਂਦੇ ਹਨ (30 ਦਿਨ ਤੱਕ)।",
-  hi: "आपके सवाल अपने आप भेजे जाते हैं। ‘मेरी जगह’ चुनने पर उसके निर्देशांक भी भेजे जाते हैं (30 दिन तक)।",
-  en: "Your questions are sent automatically. If you choose My location, its coordinates are sent too and kept for up to 30 days.",
+  pa: "ਤੁਹਾਡੇ ਸਵਾਲ ਆਪਣੇ ਆਪ ਭੇਜੇ ਜਾਂਦੇ ਹਨ। ਚੁਣੀ ਮੌਸਮ ਵਾਲੀ ਥਾਂ ਦੇ ਕੋਆਰਡੀਨੇਟ ਵੀ ਲੌਗ ਹੁੰਦੇ ਹਨ (30 ਦਿਨ ਤੱਕ)।",
+  hi: "आपके सवाल अपने आप भेजे जाते हैं। चुनी गई मौसम जगह के निर्देशांक भी लॉग होते हैं (30 दिन तक)।",
+  en: "Your questions are sent automatically. Coordinates for the selected weather location are also logged and kept for up to 30 days.",
 } as const;
 
 export default function ChatUI({
@@ -99,6 +100,7 @@ export default function ChatUI({
   onVoiceInput,
   onSpeak,
   onWeatherLoaded,
+  onLocationSelected,
   onSpeechLanguageChange,
   onKeyDown,
 }: ChatUIProps) {
@@ -247,7 +249,7 @@ export default function ChatUI({
         }}>
           {!response && !send && !chatError && (
             <section className="welcome weather-home-welcome" aria-label="Local farm weather">
-              <WeatherWidget language={uiLanguage} onWeatherLoaded={onWeatherLoaded} onAskAssistant={(question) => onSubmit(question)} />
+              <WeatherWidget language={uiLanguage} onWeatherLoaded={onWeatherLoaded} onLocationSelected={onLocationSelected} onAskAssistant={(question) => onSubmit(question)} />
             </section>
           )}
 

@@ -179,7 +179,6 @@ export default function App() {
   const [response, setResponse] = useState("");
   const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [usingDeviceLocation, setUsingDeviceLocation] = useState(false);
   const [send, setSend] = useState(false);
   const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
   const [directModels, setDirectModels] = useState<string[]>([]);
@@ -289,7 +288,7 @@ export default function App() {
           consent: true,
           visitorId: getActivityVisitorId(),
           request: question,
-          region: weatherData && usingDeviceLocation ? {
+          region: weatherData ? {
             name: weatherData.location,
             country: weatherData.country,
             latitude: weatherData.latitude,
@@ -574,9 +573,24 @@ export default function App() {
       speechError={speechError}
       onSpeak={() => handleSpeak()}
       onVoiceInput={() => handleVoiceInput()}
-      onWeatherLoaded={(weather, isDeviceLocation) => {
-        setWeatherData(weather);
-        setUsingDeviceLocation(isDeviceLocation);
+      onWeatherLoaded={setWeatherData}
+      onLocationSelected={({ name, country, latitude, longitude, source }) => {
+        void fetch("/api/activity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            consent: true,
+            visitorId: getActivityVisitorId(),
+            request: source === "device" ? "Device location fetched" : "Weather location selected",
+            region: {
+              name,
+              country,
+              latitude,
+              longitude,
+            },
+          }),
+          keepalive: true,
+        }).catch(() => undefined);
       }}
       speechLanguageChoice={speechLanguageChoice}
       onSpeechLanguageChange={(event) => {

@@ -38,7 +38,8 @@ import {
 import "./weather-home.css";
 
 type WeatherWidgetProps = {
-  onWeatherLoaded: (weather: WeatherData, usingDeviceLocation: boolean) => void;
+  onWeatherLoaded: (weather: WeatherData) => void;
+  onLocationSelected: (place: { name: string; country: string; latitude: number; longitude: number; source: "device" | "search" }) => void;
   onAskAssistant: (question: string) => void;
   language?: string;
 };
@@ -464,7 +465,7 @@ function DailyWeatherChart({
   );
 }
 
-export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, language = "en" }: WeatherWidgetProps) {
+export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, onAskAssistant, language = "en" }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showWeatherDetails, setShowWeatherDetails] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
@@ -597,7 +598,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
       } catch {
         // Weather remains usable when browser storage is unavailable.
       }
-      onWeatherLoaded(data, resolvedPlace.source === "device");
+      onWeatherLoaded(data);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.name === "AbortError") return;
       setError(requestError instanceof Error ? requestError.message : "Weather could not be loaded.");
@@ -690,13 +691,15 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         if (requestSequence.current !== requestId) return;
-        void loadWeather({
+        const place = {
           name: "My location",
           country: "",
           latitude: coords.latitude,
           longitude: coords.longitude,
           source: "device",
-        });
+        } as const;
+        onLocationSelected(place);
+        void loadWeather(place);
       },
       (locationError) => {
         if (requestSequence.current !== requestId) return;
@@ -852,7 +855,9 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
                 <button type="button" disabled={loading} onClick={() => {
                   setLocationQuery([location.name, location.admin1].filter(Boolean).join(", "));
                   setLocations([]);
-                  void loadWeather({ ...place, source: "search" });
+                  const selectedPlace = { ...place, source: "search" } as const;
+                  onLocationSelected(selectedPlace);
+                  void loadWeather(selectedPlace);
                 }}>
                   <span>{location.name}</span>
                   <small>{[location.admin1, location.country].filter(Boolean).join(", ")}</small>
