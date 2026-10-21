@@ -179,6 +179,7 @@ export default function App() {
   const [response, setResponse] = useState("");
   const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [usingDeviceLocation, setUsingDeviceLocation] = useState(false);
   const [send, setSend] = useState(false);
   const [chatMode, setChatMode] = useState<"backend" | "direct">("backend");
   const [directModels, setDirectModels] = useState<string[]>([]);
@@ -288,7 +289,7 @@ export default function App() {
           consent: true,
           visitorId: getActivityVisitorId(),
           request: question,
-          region: weatherData ? {
+          region: weatherData && usingDeviceLocation ? {
             name: weatherData.location,
             country: weatherData.country,
             latitude: weatherData.latitude,
@@ -573,7 +574,10 @@ export default function App() {
       speechError={speechError}
       onSpeak={() => handleSpeak()}
       onVoiceInput={() => handleVoiceInput()}
-      onWeatherLoaded={setWeatherData}
+      onWeatherLoaded={(weather, isDeviceLocation) => {
+        setWeatherData(weather);
+        setUsingDeviceLocation(isDeviceLocation);
+      }}
       speechLanguageChoice={speechLanguageChoice}
       onSpeechLanguageChange={(event) => {
         const choice = event.target.value;

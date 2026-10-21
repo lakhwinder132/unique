@@ -42,7 +42,7 @@ type ChatUIProps = {
   directResponseTime: number | null;
   directBusy: boolean;
   directBaseUrl: string;
-  onWeatherLoaded: (weather: WeatherData) => void;
+  onWeatherLoaded: (weather: WeatherData, usingDeviceLocation: boolean) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (prompt?: string) => void;
   onSuggestionSelect: (text: string) => void;
@@ -75,9 +75,9 @@ const localActivityLoggingCopy = {
 } as const;
 
 const automaticActivityLoggingCopy = {
-  pa: "ਤੁਹਾਡੇ ਸਵਾਲ ਅਤੇ ਮੌਸਮ ਲਈ ਵਰਤੀ ਥਾਂ ਐਪ ਦੇ ਮਾਲਕ ਨੂੰ ਆਪਣੇ ਆਪ ਭੇਜੇ ਜਾਂਦੇ ਹਨ (30 ਦਿਨ ਤੱਕ)।",
-  hi: "आपके सवाल और मौसम के लिए इस्तेमाल की गई जगह ऐप के मालिक को अपने आप भेजी जाती है (30 दिन तक)।",
-  en: "Your questions and weather location, including coordinates, are sent to the app owner and kept for up to 30 days.",
+  pa: "ਤੁਹਾਡੇ ਸਵਾਲ ਆਪਣੇ ਆਪ ਭੇਜੇ ਜਾਂਦੇ ਹਨ। ‘ਮੇਰੀ ਥਾਂ’ ਵਰਤਣ ਤੇ ਥਾਂ ਦੇ ਕੋਆਰਡੀਨੇਟ ਵੀ ਭੇਜੇ ਜਾਂਦੇ ਹਨ (30 ਦਿਨ ਤੱਕ)।",
+  hi: "आपके सवाल अपने आप भेजे जाते हैं। ‘मेरी जगह’ चुनने पर उसके निर्देशांक भी भेजे जाते हैं (30 दिन तक)।",
+  en: "Your questions are sent automatically. If you choose My location, its coordinates are sent too and kept for up to 30 days.",
 } as const;
 
 export default function ChatUI({

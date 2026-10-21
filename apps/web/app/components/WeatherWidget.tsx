@@ -38,7 +38,7 @@ import {
 import "./weather-home.css";
 
 type WeatherWidgetProps = {
-  onWeatherLoaded: (weather: WeatherData) => void;
+  onWeatherLoaded: (weather: WeatherData, usingDeviceLocation: boolean) => void;
   onAskAssistant: (question: string) => void;
   language?: string;
 };
@@ -48,6 +48,7 @@ type SelectedPlace = {
   country: string;
   latitude: number;
   longitude: number;
+  source?: "device" | "search";
 };
 
 const SAVED_WEATHER_PLACE_KEY = "sarc-weather-place-v1";
@@ -587,7 +588,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
         throw new Error(message);
       }
       if (!isWeatherData(data)) throw new Error("Weather data was incomplete. Please try again.");
-      const resolvedPlace = { ...place, name: data.location || place.name, country: data.country || place.country };
+      const resolvedPlace = { ...place, source: place.source ?? "search", name: data.location || place.name, country: data.country || place.country };
       setWeather(data);
       setSelectedPlace(resolvedPlace);
       setLocationQuery([data.location, data.country].filter(Boolean).join(", "));
@@ -596,7 +597,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
       } catch {
         // Weather remains usable when browser storage is unavailable.
       }
-      onWeatherLoaded(data);
+      onWeatherLoaded(data, resolvedPlace.source === "device");
     } catch (requestError) {
       if (requestError instanceof Error && requestError.name === "AbortError") return;
       setError(requestError instanceof Error ? requestError.message : "Weather could not be loaded.");
@@ -694,6 +695,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
           country: "",
           latitude: coords.latitude,
           longitude: coords.longitude,
+          source: "device",
         });
       },
       (locationError) => {
@@ -821,7 +823,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
             <button
               className="weather-home-refresh"
               type="button"
-              onClick={() => void loadWeather(selectedPlace)}
+              onClick={() => void loadWeather({ ...selectedPlace, source: selectedPlace.source ?? "search" })}
               disabled={loading}
               aria-label={copy.refresh}
               title={copy.refresh}
@@ -850,7 +852,7 @@ export default function WeatherWidget({ onWeatherLoaded, onAskAssistant, languag
                 <button type="button" disabled={loading} onClick={() => {
                   setLocationQuery([location.name, location.admin1].filter(Boolean).join(", "));
                   setLocations([]);
-                  void loadWeather(place);
+                  void loadWeather({ ...place, source: "search" });
                 }}>
                   <span>{location.name}</span>
                   <small>{[location.admin1, location.country].filter(Boolean).join(", ")}</small>
