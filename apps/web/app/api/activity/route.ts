@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid activity record." }, { status: 400 });
   }
-  if (!isRecord(body) || body.consent !== true) return new Response(null, { status: 204 });
+  // if (!isRecord(body)) return new Response(null, { status: 204 });
   const visitorId = typeof body.visitorId === "string" && /^[\w-]{16,80}$/.test(body.visitorId) ? body.visitorId : null;
   const requestText = typeof body.request === "string" ? body.request.trim().slice(0, 12000) : "";
   if (!visitorId || !requestText) return NextResponse.json({ error: "A visitor ID and request are required." }, { status: 400 });
