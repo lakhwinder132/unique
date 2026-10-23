@@ -28,11 +28,14 @@
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "26.4.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "eslint": "10.9.1",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^4.3.3",
     "typescript": "7.0.2"
   }
 }

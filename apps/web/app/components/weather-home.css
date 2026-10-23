@@ -1449,3 +1449,51 @@
 }
 .weather-scene-open:focus-visible { outline: 4px solid #f4d27a; outline-offset: -7px; }
 .weather-home.showing-weather-details .weather-full-report { scroll-margin-top: 16px; }
+
+.around-you-panel { margin: 20px 0 24px; overflow: hidden; border: 1px solid #e0e7dc; border-radius: 17px; background: linear-gradient(145deg,#fffefa,#f8faf5); box-shadow: 0 7px 22px rgba(45,70,49,.045); }
+.around-you-heading { display: flex; align-items: center; gap: 11px; padding: 17px 18px 13px; }
+.around-you-spark { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: #a1793e; background: #f7f0df; font-size: 22px; }
+.around-you-heading > div { min-width: 0; }
+.around-you-heading p { margin: 0 0 3px; color: #879186; font-size: 9px; font-weight: 750; letter-spacing: .1em; }
+.around-you-heading h2 { margin: 0; color: #2d4937; font-family: Georgia,"Times New Roman",serif; font-size: 21px; font-weight: 550; line-height: 1.2; }
+.around-you-heading time { margin-left: auto; color: #879186; font-size: 10px; white-space: nowrap; }
+.around-you-weather { display: flex; width: calc(100% - 36px); min-height: 76px; align-items: center; gap: 12px; margin: 0 18px 15px; padding: 12px 14px; border: 1px solid #dce7e7; border-radius: 13px; color: #355447; background: linear-gradient(110deg,#f0f6f3,#f4f7ef); text-align: left; cursor: pointer; }
+.around-you-weather:hover { border-color: #b9cdbd; background: #edf4ed; }
+.around-you-weather-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: #558176; background: rgba(255,255,255,.78); }
+.around-you-weather--rain .around-you-weather-icon,.around-you-weather--storm .around-you-weather-icon { color: #527e94; }
+.around-you-weather--clear .around-you-weather-icon { color: #b78b48; }
+.around-you-weather-copy { display: grid; min-width: 0; gap: 4px; }
+.around-you-weather-copy strong { overflow: hidden; color: #345242; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.around-you-weather-copy span { color: #66776a; font-size: 11px; line-height: 1.45; }
+.around-you-temperature { margin-left: auto; color: #365343; font-size: 19px; font-weight: 700; white-space: nowrap; }
+.around-you-life { padding: 0 18px 15px; }
+.around-you-life-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 1px 9px; }
+.around-you-life-heading h3 { margin: 0; color: #354b3a; font-size: 13px; font-weight: 720; }
+.around-you-life-heading > span { color: #899287; font-size: 10px; }
+.around-you-life-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.around-you-life-grid button { display: grid; min-width: 0; min-height: 92px; justify-items: start; align-content: start; gap: 5px; padding: 10px; border: 1px solid #e5e9e1; border-radius: 12px; color: #374c3c; background: #fff; text-align: left; cursor: pointer; transition: border-color 150ms ease,transform 150ms ease; }
+.around-you-life-grid button:hover { transform: translateY(-1px); border-color: #bdcfb7; }
+.around-you-life-grid button:focus-visible,.around-you-weather:focus-visible,.around-you-news:focus-visible { outline: 3px solid #8cac70; outline-offset: 2px; }
+.around-you-life-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; }
+.around-you-life-icon.health { color: #a65f50; background: #fbefea; }
+.around-you-life-icon.money { color: #8c7135; background: #f8f2e2; }
+.around-you-life-icon.learning { color: #547a60; background: #edf4eb; }
+.around-you-life-grid strong { font-size: 11px; line-height: 1.3; }
+.around-you-life-grid small { color: #7b867c; font-size: 9px; line-height: 1.3; }
+.around-you-news { display: flex; min-height: 43px; align-items: center; gap: 9px; padding: 0 18px; border-top: 1px solid #e8ebe4; color: #49684e; font-size: 11px; font-weight: 650; text-decoration: none; }
+.around-you-news > span:last-child { margin-left: auto; font-size: 21px; font-weight: 400; }
+.around-you-news:hover { background: #f6f8f2; }
+@media (max-width: 520px) {
+  .around-you-heading { padding: 14px 12px 11px; }
+  .around-you-heading h2 { font-size: 19px; }
+  .around-you-heading time { font-size: 9px; }
+  .around-you-weather { width: calc(100% - 24px); gap: 9px; margin: 0 12px 12px; padding: 10px; }
+  .around-you-weather-copy span { font-size: 10px; }
+  .around-you-temperature { font-size: 16px; }
+  .around-you-life { padding: 0 12px 12px; }
+  .around-you-life-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .around-you-life-grid { gap: 6px; }
+  .around-you-life-grid button { min-height: 88px; padding: 8px; }
+  .around-you-news { padding: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .around-you-life-grid button { transition: none; } .around-you-life-grid button:hover { transform: none; } }

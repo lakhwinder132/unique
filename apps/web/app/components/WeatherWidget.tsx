@@ -8,6 +8,7 @@ import {
   CloudRain,
   CloudSnow,
   CloudSun,
+  BookOpen,
   Compass,
   Droplets,
   Layers3,
@@ -20,10 +21,8 @@ import {
   Sunrise,
   Sunset,
   Sprout,
-  Scale,
   Thermometer,
   Wind,
-  Wheat,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -40,7 +39,6 @@ import "./weather-home.css";
 type WeatherWidgetProps = {
   onWeatherLoaded: (weather: WeatherData) => void;
   onLocationSelected: (place: { name: string; country: string; latitude: number; longitude: number; source: "device" | "search" }) => void;
-  onAskAssistant: (question: string) => void;
   language?: string;
 };
 
@@ -465,7 +463,7 @@ function DailyWeatherChart({
   );
 }
 
-export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, onAskAssistant, language = "en" }: WeatherWidgetProps) {
+export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, language = "en" }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showWeatherDetails, setShowWeatherDetails] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
@@ -721,6 +719,7 @@ export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, onA
   const isDay = weather ? getNumber(weather.current, "is_day") === 1 : false;
   const isNight = weather ? getNumber(weather.current, "is_day") === 0 : false;
   const conditionIcon = condition.icon;
+  const WeatherSummaryIcon = conditionIcon;
   const locationName = weather
     ? [weather.location, weather.country].filter(Boolean).join(", ")
     : "";
@@ -789,6 +788,17 @@ export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, onA
   const minimumDayTemperature = dayHours.flatMap(({ temperature }) => temperature === null ? [] : [temperature]).reduce<number | null>((minimum, value) => minimum === null ? value : Math.min(minimum, value), null);
   const maximumDayTemperature = dayHours.flatMap(({ temperature }) => temperature === null ? [] : [temperature]).reduce<number | null>((maximum, value) => maximum === null ? value : Math.max(maximum, value), null);
   const sceneMotionActive = sceneVisible && pageVisible && !reducedMotion;
+  const dayPulse = weather
+    ? peakRain && peakRain.value >= 65
+      ? language === "pa" ? "ਅੱਜ ਮੀਂਹ ਦੀ ਸੰਭਾਵਨਾ ਹੈ। ਬਾਹਰ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਘੰਟੇਵਾਰ ਅਨੁਮਾਨ ਵੇਖੋ।" : language === "hi" ? "आज बारिश की संभावना है। बाहर जाने से पहले घंटेवार पूर्वानुमान देखें।" : "Rain is possible today. Check the hourly forecast before heading out."
+      : feelsLike !== null && feelsLike >= 35
+        ? language === "pa" ? "ਅੱਜ ਗਰਮੀ ਵੱਧ ਮਹਿਸੂਸ ਹੋ ਸਕਦੀ ਹੈ। ਪਾਣੀ ਨਾਲ ਰੱਖੋ ਅਤੇ ਛਾਂ ਵਿੱਚ ਅਰਾਮ ਕਰੋ।" : language === "hi" ? "आज गर्मी ज़्यादा महसूस हो सकती है। पानी साथ रखें और छाँव में आराम करें।" : "It may feel hot today. Keep water nearby and take breaks in the shade."
+        : windSpeed !== null && windSpeed >= 30
+          ? language === "pa" ? "ਅੱਜ ਹਵਾ ਤੇਜ਼ ਹੋ ਸਕਦੀ ਹੈ। ਬਾਹਰ ਦੇ ਕੰਮ ਦੀ ਯੋਜਨਾ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ ਅਨੁਮਾਨ ਵੇਖੋ।" : language === "hi" ? "आज हवा तेज़ हो सकती है। बाहर के काम की योजना से पहले पूर्वानुमान देखें।" : "Winds may be strong today. Check the forecast before planning outdoor work."
+          : language === "pa" ? `${condition.label} · ਦਿਨ ਦਾ ਉੱਚਾ ${dailyHigh === null ? "—" : formatTemperature(dailyHigh, weather.dailyUnits.temperature_2m_max)} ਅਤੇ ਨੀਵਾਂ ${dailyLow === null ? "—" : formatTemperature(dailyLow, weather.dailyUnits.temperature_2m_min)}।`
+            : language === "hi" ? `${condition.label} · अधिकतम ${dailyHigh === null ? "—" : formatTemperature(dailyHigh, weather.dailyUnits.temperature_2m_max)} और न्यूनतम ${dailyLow === null ? "—" : formatTemperature(dailyLow, weather.dailyUnits.temperature_2m_min)}।`
+              : `${condition.label} · High ${dailyHigh === null ? "—" : formatTemperature(dailyHigh, weather.dailyUnits.temperature_2m_max)}, low ${dailyLow === null ? "—" : formatTemperature(dailyLow, weather.dailyUnits.temperature_2m_min)}.`
+    : "";
 
   const openWeatherDetails = () => {
     const details = weatherDetailsRef.current;
@@ -920,24 +930,17 @@ export default function WeatherWidget({ onWeatherLoaded, onLocationSelected, onA
         )}
       </div>
 
-      <nav className="farm-feature-grid" aria-label={language === "pa" ? "ਖੇਤੀ ਦੇ ਵਿਸ਼ੇ" : language === "hi" ? "खेती के विषय" : "Farm topics"}>
-        <button className="farm-feature-card crop" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮੇਰੀ ਫ਼ਸਲ ਦੀ ਦੇਖਭਾਲ ਵਿੱਚ ਮਦਦ ਕਰੋ।" : language === "hi" ? "मेरी फसल की देखभाल में मदद करें।" : "Help me care for my crop.")}>
-          <span className="farm-feature-picture"><Wheat size={35} strokeWidth={1.7} aria-hidden="true" /></span>
-          <span>{language === "pa" ? "ਫ਼ਸਲ" : language === "hi" ? "फसल" : "Crop"}</span>
-        </button>
-        <button className="farm-feature-card soil" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮਿੱਟੀ ਬਾਰੇ ਮੇਰੀ ਮਦਦ ਕਰੋ।" : language === "hi" ? "मिट्टी के बारे में मेरी मदद करें।" : "Help me understand my soil.")}>
-          <span className="farm-feature-picture"><Layers3 size={35} strokeWidth={1.7} aria-hidden="true" /></span>
-          <span>{language === "pa" ? "ਮਿੱਟੀ" : language === "hi" ? "मिट्टी" : "Soil"}</span>
-        </button>
-        <button className="farm-feature-card market" type="button" onClick={() => onAskAssistant(language === "pa" ? "ਮੇਰੀ ਫ਼ਸਲ ਵੇਚਣ ਤੋਂ ਪਹਿਲਾਂ ਕੀ ਜਾਂਚਣਾ ਚਾਹੀਦਾ ਹੈ?" : language === "hi" ? "फसल बेचने से पहले मुझे क्या जाँचना चाहिए?" : "What should I check before selling my crop?")}>
-          <span className="farm-feature-picture"><Scale size={35} strokeWidth={1.7} aria-hidden="true" /></span>
-          <span>{language === "pa" ? "ਫ਼ਸਲ ਵੇਚੋ" : language === "hi" ? "फसल बेचें" : "Sell crop"}</span>
-        </button>
-        <Link className="farm-feature-card news" href="/news">
-          <span className="farm-feature-picture"><Newspaper size={35} strokeWidth={1.7} aria-hidden="true" /></span>
-          <span>{language === "pa" ? "ਖ਼ਬਰਾਂ" : language === "hi" ? "खबरें" : "Farm news"}</span>
-        </Link>
-      </nav>
+      {weather && (
+        <section className="around-you-panel" aria-labelledby="around-you-title">
+          <div className="around-you-heading"><span className="around-you-spark" aria-hidden="true">✦</span><div><p>{language === "pa" ? "ਤੁਹਾਡੇ ਇਲਾਕੇ ਤੋਂ" : language === "hi" ? "आपके इलाके से" : "YOUR LOCAL SNAPSHOT"}</p><h2 id="around-you-title">{language === "pa" ? "ਅੱਜ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ" : language === "hi" ? "आज आपके आसपास" : "Today around you"}</h2></div><time dateTime={weather.fetchedAt}>{updatedAt}</time></div>
+          <button className={`around-you-weather around-you-weather--${condition.kind}`} type="button" onClick={openWeatherDetails}>
+            <span className="around-you-weather-icon"><WeatherSummaryIcon size={24} aria-hidden="true" /></span>
+            <span className="around-you-weather-copy"><strong>{locationName}</strong><span>{dayPulse}</span></span>
+            <span className="around-you-temperature">{currentTemperature === null ? "—" : formatTemperature(currentTemperature, weather.currentUnits.temperature_2m)}</span>
+          </button>
+          <Link className="around-you-news" href="/news"><Newspaper size={17} aria-hidden="true" /><span>{language === "pa" ? "ਤਾਜ਼ਾ ਖੇਤੀ ਖ਼ਬਰਾਂ" : language === "hi" ? "ताज़ा खेती की खबरें" : "Latest farm updates"}</span><span aria-hidden="true">›</span></Link>
+        </section>
+      )}
 
       {weather && (
         <div className="weather-full-report">
