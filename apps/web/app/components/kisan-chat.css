@@ -162,6 +162,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible { 
 @keyframes thinking { 0%,60%,100% { opacity: .32; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 .speak-button { display: inline-flex; min-height: 32px; align-items: center; gap: 7px; margin-top: 12px; padding: 0 10px; border: 1px solid #e2e9df; border-radius: 7px; color: #4a7454; background: #f7faf5; font-size: 9px; cursor: pointer; }
 .speak-button:hover:not(:disabled) { border-color: #c9dac5; background: #edf4e9; }
+.edit-question-button { display: block; min-height: 30px; margin-top: 7px; padding: 0; border: 0; color: #4a7454; background: transparent; font: inherit; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 .chat-input-area { z-index: 4; flex: 0 0 auto; padding: 10px clamp(18px,5vw,74px) max(12px,env(safe-area-inset-bottom)); border-top: 1px solid var(--kisan-line); background: rgba(255,255,255,.96); backdrop-filter: blur(15px); }
 .direct-ollama-panel { width: 100%; max-width: 800px; margin: 0 auto 10px; padding: 9px 11px; border: 1px solid #e2e8dd; border-radius: 8px; background: #fff; }
@@ -354,6 +355,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible { 
 .input-hint { font-size: 12px; }
 .voice-mode-status,.speech-error { font-size: 12px; }
 .speak-button { min-height: 48px; gap: 9px; padding: 0 15px; border-radius: 10px; font-size: 14px; }
+.edit-question-button { min-height: 40px; font-size: 13px; }
 .sidebar-language-section { padding: 9px 10px 0; border-top: 1px solid #dedbd2; }
 .sidebar-language-section .language-select { justify-content: space-between; gap: 10px; color: #53675a; font-size: 13px; }
 .sidebar-language-section .language-select select { min-height: 42px; font-size: 13px; }

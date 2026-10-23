@@ -9,7 +9,7 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test:chat": "node --experimental-strip-types --test app/api/chat/ollama-server.test.mjs app/services/directOllama.test.mjs",
+    "test:chat": "node --experimental-strip-types --test app/api/chat/ollama-server.test.mjs app/api/chat/conversation.test.mjs app/services/directOllama.test.mjs",
     "test:news": "node --experimental-strip-types --test app/api/news/news-service.test.mjs"
   },
   "dependencies": {

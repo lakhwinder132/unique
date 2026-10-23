@@ -23,6 +23,7 @@ type StreamEvent = {
 
 type OllamaOptions = {
   prompt: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
   weatherContext?: string;
   onChunk: (text: string) => void;
   onMetrics?: (metrics: StreamMetrics) => void;
@@ -65,6 +66,7 @@ function numericRecord(value: unknown) {
 
 export async function askOllama({
   prompt,
+  history = [],
   weatherContext,
   onChunk,
   onMetrics,
@@ -72,6 +74,14 @@ export async function askOllama({
 }: OllamaOptions) {
   const startedAt = performance.now();
   const requestId = createRequestId();
+  const boundedHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+  let historyChars = 0;
+  for (const message of history.slice(-12).reverse()) {
+    const content = message.content.slice(0, 4000);
+    if (historyChars + content.length > 12000) continue;
+    boundedHistory.unshift({ role: message.role, content });
+    historyChars += content.length;
+  }
   let headersAt = startedAt;
   let firstBackendEventAt: number | null = null;
   let firstVisibleTextAt: number | null = null;
@@ -110,7 +120,7 @@ export async function askOllama({
         "Content-Type": "application/json",
         "X-Request-ID": requestId,
       },
-      body: JSON.stringify({ prompt, weatherContext }),
+      body: JSON.stringify({ prompt, messages: [...boundedHistory, { role: "user", content: prompt }], weatherContext }),
       signal,
       cache: "no-store",
     });

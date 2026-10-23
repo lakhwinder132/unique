@@ -16,25 +16,13 @@ import { generateDirectOllama, listDirectOllamaModels } from "./services/directO
 import { detectTextLanguage } from "./services/language";
 import { recordAudio } from "./speech/speechRecorder";
 
+type ChatTurn = { role: "user" | "assistant"; content: string };
+
 import "./app.css";
 
 const weatherQuestionPattern = /\b(weather|forecast|rain|rainfall|temperature|wind|windy|humidity|heat|cold|storm|cloud|spray|irrigat|mausam|barish|baarish|meeh|garmi|thand|hawa)\b|मौसम|बारिश|वर्षा|तापमान|हवा|आर्द्रता|तूफान|ਮੌਸਮ|ਮੀਂਹ|ਬਾਰਿਸ਼|ਤਾਪਮਾਨ|ਹਵਾ|ਨਮੀ|ਤੂਫ਼ਾਨ/i;
 const directTestingEnabled = process.env.NODE_ENV !== "production";
 const directOllamaBaseUrl = process.env.NEXT_PUBLIC_OLLAMA_TEST_URL?.trim() ?? "";
-
-function getActivityVisitorId() {
-  try {
-    const saved = window.sessionStorage.getItem("kisan-ai-activity-visitor");
-    if (saved) return saved;
-    const id = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    window.sessionStorage.setItem("kisan-ai-activity-visitor", id);
-    return id;
-  } catch {
-    return `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-}
 
 function buildWeatherContext(weather: WeatherData, question: string) {
   const asksForRain = /rain|precip|shower|irrigat|water|meeh|ਮੀਂਹ|ਬਾਰਿਸ਼|बारिश|वर्षा|सਿੰਚਾਈ/i.test(question);
@@ -159,6 +147,71 @@ async function speakWithDeviceVoice(text: string, language: string, signal: Abor
   });
 }
 
+function createProgressiveSpeech(language: string, signal: AbortSignal, onFirstAudio: (elapsedMs: number) => void) {
+  const startedAt = performance.now();
+  let firstAudioAt: number | null = null;
+  let failure: string | null = null;
+  let queue = Promise.resolve();
+  const enqueue = (rawText: string) => {
+    const text = cleanTextForSpeech(rawText).trim();
+    if (!text || failure || signal.aborted) return;
+    queue = queue.then(async () => {
+      if (failure || signal.aborted) return;
+      const response = await fetch("/api/speech/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({ text, language: ["pa", "hi", "en"].includes(language) ? language : "en" }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Speech audio could not be created.");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const audio = new Audio(url);
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          signal.removeEventListener("abort", abort);
+          URL.revokeObjectURL(url);
+        };
+        const abort = () => {
+          audio.pause();
+          cleanup();
+          resolve();
+        };
+        audio.onended = () => { cleanup(); resolve(); };
+        audio.onerror = () => { cleanup(); reject(new Error("Could not play the generated audio.")); };
+        signal.addEventListener("abort", abort, { once: true });
+        audio.play().then(() => {
+          if (firstAudioAt === null) {
+            firstAudioAt = performance.now();
+            onFirstAudio(Math.round(firstAudioAt - startedAt));
+          }
+        }).catch((error) => { cleanup(); reject(error); });
+      });
+    }).catch((error: unknown) => {
+      if (!signal.aborted) failure = error instanceof Error ? error.message : "Speech playback failed.";
+    });
+  };
+  return {
+    enqueue,
+    async finish() {
+      await queue;
+      return {
+        error: failure,
+        totalMs: Math.round(performance.now() - startedAt),
+        firstAudioMs: firstAudioAt === null ? null : Math.round(firstAudioAt - startedAt),
+      };
+    },
+  };
+}
+
+function takeCompleteSpeechSentences(text: string) {
+  const matches = text.match(/[\s\S]*?[.!?।॥](?:\s+|$)/g) ?? [];
+  const complete = matches.join("");
+  return { complete, remainder: text.slice(complete.length) };
+}
+
 function awaitVoiceList(synthesis: SpeechSynthesis) {
   return new Promise<void>((resolve) => {
     const timeout = window.setTimeout(resolve, 1500);
@@ -177,6 +230,8 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [response, setResponse] = useState("");
+  const [conversation, setConversation] = useState<ChatTurn[]>([]);
+  const conversationRef = useRef<ChatTurn[]>([]);
   const [chatError, setChatError] = useState("");
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [send, setSend] = useState(false);
@@ -198,17 +253,20 @@ export default function App() {
   const [speaking, setSpeaking] = useState(false);
   const [speechError, setSpeechError] = useState("");
   const recordingController = useRef<AbortController | null>(null);
+  const chatRequestController = useRef<AbortController | null>(null);
   const speechRequestController = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const speechController = useRef<AbortController | null>(null);
   const voiceModeRef = useRef(false);
   const explainQuestionHandledRef = useRef(false);
+  const lastVoiceSubmissionRef = useRef<{ text: string; at: number } | null>(null);
 
   useEffect(() => () => {
     audioRef.current?.pause();
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     recordingController.current?.abort();
+    chatRequestController.current?.abort();
     speechRequestController.current?.abort();
     speechController.current?.abort();
     voiceModeRef.current = false;
@@ -237,7 +295,7 @@ export default function App() {
     setPrompt(e.target.value);
   };
 
-  const getAnswer = async (question: string) => {
+  const getAnswer = async (question: string, history: ChatTurn[], signal: AbortSignal, onText?: (text: string) => void) => {
     if (chatMode === "direct") {
       if (!directModel) throw new Error("Test the connection and select an installed Ollama model first.");
       setDirectStatus(`Generating with ${directModel}…`);
@@ -265,8 +323,10 @@ export default function App() {
 
     return askOllama({
       prompt: question,
+      history,
+      signal,
       weatherContext,
-      onChunk: setResponse,
+      onChunk: (text) => { setResponse(text); onText?.(text); },
       onMetrics: (metrics) => console.info("[chat-timing]", metrics),
     });
   };
@@ -275,28 +335,11 @@ export default function App() {
   // EXISTING SEND FUNCTION
   // ============================================
 
-  const handleSubmit = async (voiceQuestion?: string) => {
+  const handleSubmit = async (voiceQuestion?: string, voiceLanguage?: string) => {
     const question = (voiceQuestion ?? prompt).trim();
     if (!question || send || directBusy) {
       return;
     }
-
-    void fetch("/api/activity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          consent: true,
-          visitorId: getActivityVisitorId(),
-          request: question,
-          region: weatherData ? {
-            name: weatherData.location,
-            country: weatherData.country,
-            latitude: weatherData.latitude,
-            longitude: weatherData.longitude,
-          } : null,
-        }),
-        keepalive: true,
-    }).catch(() => undefined);
 
     audioRef.current?.pause();
     speechController.current?.abort();
@@ -310,10 +353,47 @@ export default function App() {
 
     setSend(true);
     setResponse("");
+    const priorHistory = conversationRef.current;
+    const chatRequest = new AbortController();
+    chatRequestController.current = chatRequest;
+    const progressiveController = voiceLanguage && voiceModeRef.current && chatMode === "backend"
+      ? new AbortController()
+      : null;
+    const progressiveSpeech = progressiveController
+      ? createProgressiveSpeech(voiceLanguage ?? "en", progressiveController.signal, (firstAudioMs) => {
+        console.info("[speech-timing] first audio", { firstAudioMs });
+      })
+      : null;
+    let spokenSource = "";
+    let speechBuffer = "";
+    if (progressiveController) {
+      speechController.current = progressiveController;
+      setSpeaking(true);
+    }
 
     try {
-      return await getAnswer(question);
+      const answer = await getAnswer(question, priorHistory, chatRequest.signal, progressiveSpeech ? (fullText) => {
+        const addition = fullText.slice(spokenSource.length);
+        spokenSource = fullText;
+        speechBuffer += addition;
+        const sentences = takeCompleteSpeechSentences(speechBuffer);
+        if (sentences.complete) progressiveSpeech.enqueue(sentences.complete);
+        speechBuffer = sentences.remainder;
+      } : undefined);
+      let speechMetrics: { error: string | null; totalMs: number; firstAudioMs: number | null } | null = null;
+      if (progressiveSpeech) {
+        if (speechBuffer.trim()) progressiveSpeech.enqueue(speechBuffer);
+        speechMetrics = await progressiveSpeech.finish();
+        setSpeaking(false);
+        if (speechMetrics.error) setSpeechError(speechMetrics.error);
+        else console.info("[speech-timing] progressive playback complete", speechMetrics);
+      }
+      const nextConversation = [...priorHistory, { role: "user" as const, content: question }, { role: "assistant" as const, content: answer }];
+      conversationRef.current = nextConversation;
+      setConversation(nextConversation);
+      return { answer, spokenProgressively: Boolean(progressiveSpeech) };
     } catch (error) {
+      if (chatRequest.signal.aborted) return;
       console.error(error);
       const message = error instanceof Error
         ? error.message
@@ -322,6 +402,11 @@ export default function App() {
       setPrompt(question);
       if (chatMode === "direct") setDirectStatus(`Request failed: ${message}`);
     } finally {
+      if (chatRequestController.current === chatRequest) chatRequestController.current = null;
+      if (progressiveController) {
+        if (speechController.current === progressiveController) speechController.current = null;
+        setSpeaking(false);
+      }
       setSend(false);
     }
   };
@@ -359,6 +444,30 @@ export default function App() {
     }
   };
 
+  const handleEditSubmittedQuestion = () => {
+    voiceModeRef.current = false;
+    setVoiceMode(false);
+    recordingController.current?.abort();
+    speechRequestController.current?.abort();
+    chatRequestController.current?.abort();
+    speechController.current?.abort();
+    const history = conversationRef.current;
+    const hasCurrentTurn = history.at(-2)?.role === "user"
+      && history.at(-2)?.content === submittedPrompt
+      && history.at(-1)?.role === "assistant"
+      && history.at(-1)?.content === response;
+    if (hasCurrentTurn) {
+      const previous = history.slice(0, -2);
+      conversationRef.current = previous;
+      setConversation(previous);
+    }
+    setPrompt(submittedPrompt);
+    setSubmittedPrompt("");
+    setResponse("");
+    setChatError("");
+    setSpeaking(false);
+  };
+
   // ============================================
   // ENTER KEY
   // ============================================
@@ -386,6 +495,7 @@ export default function App() {
       setVoiceMode(false);
       recordingController.current?.abort();
       speechRequestController.current?.abort();
+      chatRequestController.current?.abort();
       speechController.current?.abort();
       audioRef.current?.pause();
       setSpeaking(false);
@@ -398,6 +508,7 @@ export default function App() {
     }
 
     const recording = new AbortController();
+    const recognitionStartedAt = performance.now();
     recordingController.current = recording;
     try {
       // Tell UI that recording has started
@@ -441,11 +552,22 @@ export default function App() {
 
       setLanguage(data.language || "");
       const transcript = typeof data.text === "string" ? data.text.trim() : "";
+      console.info("[speech-timing] recognition complete", {
+        recognitionMs: Math.round(performance.now() - recognitionStartedAt),
+        language: data.language || "unknown",
+        transcriptLength: transcript.length,
+      });
       if (transcript && voiceModeRef.current) {
+        const previousTranscript = lastVoiceSubmissionRef.current;
+        if (previousTranscript && previousTranscript.text === transcript && performance.now() - previousTranscript.at < 8000) {
+          console.info("[speech] ignored repeated transcript", { transcriptLength: transcript.length });
+          return;
+        }
+        lastVoiceSubmissionRef.current = { text: transcript, at: performance.now() };
         setPrompt("");
-        const answer = await handleSubmit(transcript);
-        if (voiceModeRef.current && answer) {
-          await handleSpeak(answer, data.language || "");
+        const result = await handleSubmit(transcript, data.language || "");
+        if (voiceModeRef.current && result?.answer && !result.spokenProgressively) {
+          await handleSpeak(result.answer, data.language || "");
         }
       }
 
@@ -483,6 +605,7 @@ export default function App() {
     setSpeaking(true);
     const controller = new AbortController();
     speechController.current = controller;
+    const speechStartedAt = performance.now();
     try {
       const cleanedText = cleanTextForSpeech(text);
       const speechLanguage = detectedLanguage || detectTextLanguage(cleanedText)?.code || "en";
@@ -511,11 +634,16 @@ export default function App() {
       audioUrlRef.current = audioUrl;
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
+      let firstAudioAt: number | null = null;
       await new Promise<void>((resolve) => {
         const finish = () => {
           URL.revokeObjectURL(audioUrl);
           audioUrlRef.current = null;
           setSpeaking(false);
+          console.info("[speech-timing] playback complete", {
+            firstAudioMs: firstAudioAt === null ? null : Math.round(firstAudioAt - speechStartedAt),
+            totalPlaybackMs: Math.round(performance.now() - speechStartedAt),
+          });
           resolve();
         };
         audio.onended = finish;
@@ -527,7 +655,9 @@ export default function App() {
           audio.pause();
           finish();
         }, { once: true });
-        audio.play().catch(() => {
+        audio.play().then(() => {
+          if (firstAudioAt === null) firstAudioAt = performance.now();
+        }).catch(() => {
           setSpeechError("Could not play the generated audio.");
           finish();
         });
@@ -553,12 +683,14 @@ export default function App() {
     <ChatUI
       prompt={prompt}
       submittedPrompt={submittedPrompt}
+      conversation={conversation}
       response={response}
       chatError={chatError}
       send={send}
 
       onPromptChange={handleChange}
       onSubmit={(question) => handleSubmit(question)}
+      onEditQuestion={handleEditSubmittedQuestion}
       onSuggestionSelect={(text) => {
         setLanguage("");
         setPrompt(text);
@@ -574,24 +706,7 @@ export default function App() {
       onSpeak={() => handleSpeak()}
       onVoiceInput={() => handleVoiceInput()}
       onWeatherLoaded={setWeatherData}
-      onLocationSelected={({ name, country, latitude, longitude, source }) => {
-        void fetch("/api/activity", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            consent: true,
-            visitorId: getActivityVisitorId(),
-            request: source === "device" ? "Device location fetched" : "Weather location selected",
-            region: {
-              name,
-              country,
-              latitude,
-              longitude,
-            },
-          }),
-          keepalive: true,
-        }).catch(() => undefined);
-      }}
+      onLocationSelected={() => undefined}
       speechLanguageChoice={speechLanguageChoice}
       onSpeechLanguageChange={(event) => {
         const choice = event.target.value;

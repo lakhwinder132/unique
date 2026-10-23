@@ -11,10 +11,10 @@ test("loads installed models from the official tags endpoint", async () => {
   };
   try {
     assert.deepEqual(
-      await listDirectOllamaModels("http://3.7.66.165:11434/"),
+      await listDirectOllamaModels("http://3.7.252.21:11434/"),
       [{ name: "qwen3:1.7b" }, { name: "llama3" }],
     );
-    assert.equal(requestedUrl, "http://3.7.66.165:11434/api/tags");
+    assert.equal(requestedUrl, "http://3.7.252.21:11434/api/tags");
   } finally {
     globalThis.fetch = originalFetch;
   }

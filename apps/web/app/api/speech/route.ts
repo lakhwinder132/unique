@@ -27,7 +27,7 @@ const ASR_ENGLISH_SERVICE_ID =
    BHASHINI REQUEST
    ========================================================= */
 
-async function bhashiniRequest(payload: unknown) {
+async function bhashiniRequest(payload: unknown, signal?: AbortSignal) {
   if (!BHASHINI_API_KEY) {
     throw new Error(
       "BHASHINI_API_KEY is missing from .env.local"
@@ -48,6 +48,10 @@ async function bhashiniRequest(payload: unknown) {
     },
 
     body: JSON.stringify(payload),
+    signal: AbortSignal.any([
+      ...(signal ? [signal] : []),
+      AbortSignal.timeout(60000),
+    ]),
   });
 
   const text = await response.text();
@@ -58,15 +62,13 @@ async function bhashiniRequest(payload: unknown) {
     data = JSON.parse(text);
   } catch {
     throw new Error(
-      `BHASHINI returned invalid JSON: ${text}`
+      "BHASHINI returned invalid JSON."
     );
   }
 
   if (!response.ok) {
     throw new Error(
-      `BHASHINI error ${response.status}: ${JSON.stringify(
-        data
-      )}`
+      `BHASHINI returned HTTP ${response.status}.`
     );
   }
 
@@ -78,9 +80,9 @@ async function bhashiniRequest(payload: unknown) {
    ========================================================= */
 
 async function detectLanguage(
-  audioBase64: string
+  audioBase64: string,
+  signal?: AbortSignal,
 ) {
-  console.log("🌐 Detecting language with BHASHINI...");
 
   const payload = {
     pipelineTasks: [
@@ -102,12 +104,7 @@ async function detectLanguage(
     },
   };
 
-  const data = await bhashiniRequest(payload);
-
-  console.log(
-    "🌐 ALD response:",
-    JSON.stringify(data, null, 2)
-  );
+  const data = await bhashiniRequest(payload, signal);
 
   const prediction =
     data?.pipelineResponse?.[0]?.output?.[0];
@@ -146,14 +143,6 @@ async function detectLanguage(
     );
   }
 
-  console.log(
-    `🌐 Detected language: ${language}`
-  );
-
-  console.log(
-    `🌐 Confidence: ${confidence}`
-  );
-
   return {
     language,
     confidence,
@@ -167,11 +156,9 @@ async function detectLanguage(
 async function speechToText(
   audioBase64: string,
   language: string,
-  samplingRate: number
+  samplingRate: number,
+  signal?: AbortSignal,
 ) {
-  console.log(
-    `📝 Running ASR for language: ${language}`
-  );
 
   let serviceId: string;
 
@@ -230,17 +217,7 @@ async function speechToText(
     },
   };
 
-  console.log(
-    `📝 ASR service: ${serviceId}`
-  );
-
-  const data = await bhashiniRequest(
-    payload
-  );
-
-  console.log(
-    "📝 ASR response received"
-  );
+  const data = await bhashiniRequest(payload, signal);
 
   const output =
     data?.pipelineResponse?.[0]?.output?.[0];
@@ -267,9 +244,7 @@ async function speechToText(
     !transcript.trim()
   ) {
     throw new Error(
-      `BHASHINI ASR returned no transcript: ${JSON.stringify(
-        output
-      )}`
+      "BHASHINI ASR returned no transcript."
     );
   }
 
@@ -283,17 +258,7 @@ async function speechToText(
 export async function POST(
   request: NextRequest
 ) {
-  console.log(
-    "\n========================================"
-  );
-
-  console.log(
-    "🎤 SPEECH API REQUEST"
-  );
-
-  console.log(
-    "========================================"
-  );
+  const startedAt = performance.now();
 
   try {
     /* -----------------------------------------------------
@@ -322,14 +287,6 @@ export async function POST(
       );
     }
 
-    console.log(
-      `Browser audio: ${audio.type}`
-    );
-
-    console.log(
-      `Audio size: ${audio.size}`
-    );
-
     /* -----------------------------------------------------
        IMPORTANT
        -----------------------------------------------------
@@ -346,9 +303,6 @@ export async function POST(
       !audio.type.includes("wav") &&
       !audio.type.includes("wave")
     ) {
-      console.warn(
-        `⚠️ Audio MIME type is ${audio.type}. Expected audio/wav.`
-      );
     }
 
     /* -----------------------------------------------------
@@ -392,10 +346,6 @@ export async function POST(
         12
       );
 
-    console.log(
-      `WAV header: ${riff} / ${wave}`
-    );
-
     if (
       riff !== "RIFF" ||
       wave !== "WAVE"
@@ -414,10 +364,6 @@ export async function POST(
         "base64"
       );
 
-    console.log(
-      `Base64 audio length: ${audioBase64.length}`
-    );
-
     /* -----------------------------------------------------
        STEP 1: LANGUAGE DETECTION
        ----------------------------------------------------- */
@@ -427,7 +373,7 @@ export async function POST(
       typeof requestedLanguage === "string" &&
       ["pa", "hi", "en"].includes(requestedLanguage)
         ? { language: requestedLanguage, confidence: null }
-        : await detectLanguage(audioBase64);
+        : await detectLanguage(audioBase64, request.signal);
     const { language, confidence } = detection;
 
     /* -----------------------------------------------------
@@ -443,32 +389,15 @@ export async function POST(
       await speechToText(
         audioBase64,
         language,
-        samplingRate
+        samplingRate,
+        request.signal,
       );
 
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "✅ SPEECH RECOGNITION SUCCESS"
-    );
-
-    console.log(
-      `Language: ${language}`
-    );
-
-    console.log(
-      `Confidence: ${confidence}`
-    );
-
-    console.log(
-      `Transcript: ${text}`
-    );
-
-    console.log(
-      "========================================"
-    );
+    console.info("[speech] recognition complete", {
+      language,
+      transcriptLength: text.length,
+      recognitionMs: Math.round(performance.now() - startedAt),
+    });
 
     /* -----------------------------------------------------
        RETURN RESULT
@@ -488,7 +417,7 @@ export async function POST(
       "\n❌ SPEECH API ERROR:"
     );
 
-    console.error(error);
+    console.error("[speech] recognition failed");
 
     return NextResponse.json(
       {

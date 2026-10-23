@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
         }],
         inputData: { input: [{ source: text.trim() }] },
       }),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(60000)]),
     });
 
     const data = await response.json();

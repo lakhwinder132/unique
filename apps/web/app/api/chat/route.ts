@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { detectTextLanguage } from "../../services/language";
 import { retrieveRagContext, type RagPayload } from "./rag-worker";
 import { getOllamaChatEndpoint, readOllamaStream } from "./ollama-server";
+import { buildRetrievalQuestion, prepareConversation } from "./conversation";
 
 const SEARCH_SERVICE_URL = process.env.SEARCH_SERVICE_URL ?? "http://3.108.65.156:3001";
 const MODEL = "qwen3:1.7b";
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
   }
 
   const legacyMessages = Array.isArray(body.messages)
-    ? body.messages.filter((message) => !isSystemMessage(message)).filter(isRecord) as Array<Record<string, unknown>>
+    ? body.messages.filter((message) => !isSystemMessage(message)).filter(isRecord)
     : [];
   const requestedPrompt = typeof body.prompt === "string" ? body.prompt : "";
   const promptMessage = legacyMessages.length > 0 ? findLastUserMessage(legacyMessages) : null;
@@ -182,9 +183,10 @@ export async function POST(request: NextRequest) {
   }
 
   const weatherContext = typeof body.weatherContext === "string" ? body.weatherContext.slice(0, 40000) : "";
-  const history = legacyMessages.filter((message) =>
-    message.role === "user" || message.role === "assistant",
-  );
+  // Keep the newest exchanges within a fixed request budget and make sure the
+  // current question appears exactly once at the end of the Ollama messages.
+  const history = prepareConversation(body.messages, prompt);
+  const retrievalQuestion = buildRetrievalQuestion(history, prompt);
   const ragStarted = performance.now();
   const searchStarted = performance.now();
   const timings: Record<string, number | boolean> = {};
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
   const needsRag = farmingQuestionPattern.test(prompt);
   const needsWebSearch = currentInformationPattern.test(prompt) && !weatherQuestionPattern.test(prompt);
   const ragWorkPromise = needsRag
-    ? retrieveRagContext(prompt, detectAnswerLanguage(prompt), requestController.signal)
+    ? retrieveRagContext(retrievalQuestion, detectAnswerLanguage(prompt), requestController.signal)
       .then((payload) => {
         timings.ragMs = Math.round(performance.now() - ragStarted);
         if (RAG_DEBUG) console.log("[chat]", requestId, "rag results:", payload.results?.length ?? 0);
@@ -265,9 +267,9 @@ export async function POST(request: NextRequest) {
         : undefined,
     ].filter(Boolean).join("\n\n");
     const user = buildUserContent(prompt, ragPayload, webContext, weatherContext);
-    const messages = history.length > 0
-      ? history.map((message) => message === promptMessage?.message ? { ...message, content: user } : message)
-      : [{ role: "user", content: user }];
+    const messages = history.map((message, index) => index === history.length - 1
+      ? { ...message, content: user }
+      : message);
     const finalMessages = [{ role: "system", content: system }, ...messages];
 
     const ollamaStarted = performance.now();

@@ -23,6 +23,7 @@ import WeatherWidget from "./WeatherWidget";
 import type { WeatherData } from "../services/weather";
 
 type ChatUIProps = {
+  conversation: Array<{ role: "user" | "assistant"; content: string }>;
   prompt: string;
   submittedPrompt: string;
   response: string;
@@ -46,6 +47,7 @@ type ChatUIProps = {
   onLocationSelected: (place: { name: string; country: string; latitude: number; longitude: number; source: "device" | "search" }) => void;
   onPromptChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (prompt?: string) => void;
+  onEditQuestion: () => void;
   onSuggestionSelect: (text: string) => void;
   onVoiceInput: () => void;
   onSpeak: () => void;
@@ -84,6 +86,7 @@ const automaticActivityLoggingCopy = {
 export default function ChatUI({
   prompt,
   submittedPrompt,
+  conversation,
   response,
   chatError,
   send,
@@ -96,6 +99,7 @@ export default function ChatUI({
   directBusy,
   onPromptChange,
   onSubmit,
+  onEditQuestion,
   onSuggestionSelect,
   onVoiceInput,
   onSpeak,
@@ -253,7 +257,11 @@ export default function ChatUI({
             </section>
           )}
 
-          {(send || response || chatError) && <div className="message user-message"><div className="message-body"><div className="message-name">{copy.you}</div><div className="message-text">{submittedPrompt}</div></div></div>}
+          {conversation.slice(0, !send && !chatError && conversation.at(-2)?.content === submittedPrompt && conversation.at(-1)?.content === response ? -2 : undefined).map((message, index) => message.role === "user"
+            ? <div className="message user-message" key={`user-${index}`}><div className="message-body"><div className="message-name">{copy.you}</div><div className="message-text">{message.content}</div></div></div>
+            : <div className="message ai-message" key={`assistant-${index}`}><div className="avatar ai-avatar" aria-hidden="true"><Sprout size={19} /></div><div className="message-body"><div className="message-name">Kisan AI</div><div className="message-text"><ReactMarkdown>{message.content}</ReactMarkdown></div></div></div>)}
+
+          {(send || response || chatError) && <div className="message user-message"><div className="message-body"><div className="message-name">{copy.you}</div><div className="message-text">{submittedPrompt}</div>{!send && !chatError && response && <button type="button" className="edit-question-button" onClick={onEditQuestion}>{uiLanguage === "pa" ? "ਸਵਾਲ ਠੀਕ ਕਰੋ" : uiLanguage === "hi" ? "सवाल सुधारें" : "Edit question"}</button>}</div></div>}
 
           {(response || send || chatError) && (
             <div className="message ai-message">

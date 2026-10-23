@@ -2,9 +2,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-const DATA_ROOT = "D:\\Users\\Course_Code\\data\\punjabi-farmer-data";
-const PYTHON_PATH = path.join(DATA_ROOT, ".venv", "Scripts", "python.exe");
-const RAG_SCRIPT_DIR = path.join(DATA_ROOT, "scripts");
+const DATA_ROOT = path.resolve(/*turbopackIgnore: true*/ process.env.RAG_DATA_ROOT ?? "D:\\Users\\Course_Code\\data\\punjabi-farmer-data");
+const DEFAULT_PYTHON = path.join(DATA_ROOT, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+const PYTHON_PATH = process.env.RAG_PYTHON_PATH?.trim() || DEFAULT_PYTHON;
+const RAG_SCRIPT_DIR = path.resolve(/*turbopackIgnore: true*/ process.env.RAG_SCRIPT_DIR ?? path.join(DATA_ROOT, "scripts"));
 const RAG_TOP_K = Number(process.env.RAG_TOP_K ?? "5");
 const REQUEST_TIMEOUT_MS = 180000;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -103,7 +104,7 @@ class RagWorker {
 
   private start() {
     if (this.child) return;
-    const child = spawn(PYTHON_PATH, ["-u", "-c", workerSource], {
+    const child = spawn(/*turbopackIgnore: true*/ PYTHON_PATH, ["-u", "-c", workerSource], {
       cwd: DATA_ROOT,
       stdio: "pipe",
       env: {
